@@ -1,0 +1,257 @@
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { reportsApi } from "@/lib/reports";
+import type { DailyReport } from "@/types/report";
+import Navbar from "@/components/Navbar";
+
+type Tab = "daily" | "weekly" | "monthly";
+
+const TABS: { key: Tab; label: string }[] = [
+  { key: "daily",   label: "Hoy" },
+  { key: "weekly",  label: "Esta semana" },
+  { key: "monthly", label: "Este mes" },
+];
+
+const METHOD_CFG: Record<string, { label: string; color: string }> = {
+  cash:     { label: "Efectivo",      color: "#00e5a0" },
+  card:     { label: "Tarjeta",       color: "#74b9ff" },
+  transfer: { label: "Transferencia", color: "#ff9f43" },
+};
+
+const RANK_COLORS = ["#00e5a0", "#74b9ff", "#ff9f43", "#555", "#555"];
+
+function pctDiff(a: number, b: number) {
+  if (b === 0) return null;
+  return Math.round(((a - b) / b) * 100);
+}
+
+function getPeriodComparison(tab: Tab, report: DailyReport & Record<string, number>) {
+  if (tab === "daily") {
+    return { prev: report.yesterday_total ?? 0, prevCount: report.yesterday_count ?? 0, label: "ayer" };
+  }
+  if (tab === "weekly") {
+    return { prev: report.last_week_total ?? 0, prevCount: report.last_week_count ?? 0, label: "sem. ant." };
+  }
+  return { prev: report.last_period_total ?? 0, prevCount: report.last_period_count ?? 0, label: "mes ant." };
+}
+
+export default function Reports() {
+  const [tab, setTab] = useState<Tab>("daily");
+
+  const queryFn = tab === "daily" ? reportsApi.daily : tab === "weekly" ? reportsApi.weekly : reportsApi.monthly;
+  const { data: report, isLoading } = useQuery({
+    queryKey: ["reports", tab],
+    queryFn,
+  });
+
+  const r = report as (DailyReport & Record<string, number>) | undefined;
+  const comparison = r ? getPeriodComparison(tab, r) : null;
+  const pct = comparison ? pctDiff(r!.total_sales, comparison.prev) : null;
+
+  const ingresosLabel = tab === "daily" ? "INGRESOS HOY" : tab === "weekly" ? "INGRESOS ESTA SEMANA" : "INGRESOS ESTE MES";
+
+  return (
+    <div className="min-h-screen bg-[#0f0f0f] pb-24">
+      <div className="px-4 pt-5 pb-3">
+        <h1 className="text-2xl font-bold text-[#f0f0f0] mb-4">Reportes</h1>
+        <div className="flex gap-2">
+          {TABS.map((t) => (
+            <button
+              key={t.key}
+              onClick={() => setTab(t.key)}
+              className="px-4 py-1.5 rounded-full text-sm font-medium transition-all"
+              style={{
+                background: tab === t.key ? "rgba(0,229,160,0.12)" : "transparent",
+                border: tab === t.key ? "1px solid rgba(0,229,160,0.35)" : "1px solid rgba(255,255,255,0.1)",
+                color: tab === t.key ? "#00e5a0" : "#666",
+              }}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="px-4 flex flex-col gap-3 pb-4">
+        {isLoading && (
+          <>
+            {[100, 80, 220, 180].map((h, i) => (
+              <div key={i} className="bg-[#1a1a1a] animate-pulse rounded-[14px]" style={{ height: h }} />
+            ))}
+          </>
+        )}
+
+        {r && (
+          <>
+            {/* Ingresos + Ganancia */}
+            <div className="grid grid-cols-2 gap-3">
+              {/* Ingresos */}
+              <div
+                className="rounded-[16px] px-4 py-4"
+                style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)" }}
+              >
+                <p className="text-[10px] font-semibold text-[#555] uppercase tracking-widest mb-1">{ingresosLabel}</p>
+                <p className="text-2xl font-bold text-[#f0f0f0] font-mono leading-tight">
+                  ${r.total_sales.toLocaleString("es-MX", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                </p>
+                {pct !== null ? (
+                  <p className="text-xs mt-1.5 font-medium" style={{ color: pct >= 0 ? "#00e5a0" : "#ff6b6b" }}>
+                    {pct >= 0 ? "↑" : "↓"} {Math.abs(pct)}% vs {comparison!.label}
+                  </p>
+                ) : (
+                  <p className="text-[10px] text-[#333] mt-1.5">Sin datos previos</p>
+                )}
+              </div>
+
+              {/* Ganancia */}
+              <div
+                className="rounded-[16px] px-4 py-4 relative overflow-hidden"
+                style={{
+                  background: "linear-gradient(135deg, rgba(0,229,160,0.13) 0%, rgba(0,229,160,0.05) 100%)",
+                  border: "1.5px solid rgba(0,229,160,0.35)",
+                  boxShadow: "0 0 24px rgba(0,229,160,0.08)",
+                }}
+              >
+                <div
+                  className="absolute -top-4 -right-4 w-20 h-20 rounded-full pointer-events-none"
+                  style={{ background: "rgba(0,229,160,0.15)", filter: "blur(16px)" }}
+                />
+                <p className="text-[10px] font-bold uppercase tracking-widest mb-1" style={{ color: "rgba(0,229,160,0.55)" }}>
+                  💰 Ganancia
+                </p>
+                {r.gross_profit > 0 ? (
+                  <>
+                    <p
+                      className="text-2xl font-black font-mono leading-tight"
+                      style={{ color: "#00e5a0", textShadow: "0 0 16px rgba(0,229,160,0.45)" }}
+                    >
+                      ${r.gross_profit.toLocaleString("es-MX", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                    </p>
+                    {r.total_sales > 0 && (
+                      <p className="text-xs mt-1.5 font-bold" style={{ color: "#00e5a0" }}>
+                        {Math.round((r.gross_profit / r.total_sales) * 100)}% margen
+                      </p>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    <p className="text-2xl font-black font-mono text-[#2a2a2a] leading-tight">$0</p>
+                    <p className="text-[10px] text-[#333] mt-1.5">Agrega costos a tus productos</p>
+                  </>
+                )}
+              </div>
+            </div>
+
+            {/* Ventas + Ticket */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="bg-[#1a1a1a] border border-white/[0.08] rounded-[14px] px-4 py-4">
+                <p className="text-xs text-[#666] uppercase tracking-wider mb-1">Ventas</p>
+                <p className="text-2xl font-bold text-[#f0f0f0] font-mono">{r.transaction_count}</p>
+              </div>
+              <div className="bg-[#1a1a1a] border border-white/[0.08] rounded-[14px] px-4 py-4">
+                <p className="text-xs text-[#666] uppercase tracking-wider mb-1">Ticket prom.</p>
+                <p className="text-2xl font-bold text-[#f0f0f0] font-mono">
+                  ${Math.round(r.avg_ticket).toLocaleString("es-MX")}
+                </p>
+              </div>
+            </div>
+
+            {/* Top productos */}
+            {r.top_products.length > 0 && (
+              <div className="bg-[#1a1a1a] border border-white/[0.08] rounded-[14px] px-4 py-4">
+                <p className="text-xs font-semibold text-[#666] uppercase tracking-wider mb-4">
+                  Top productos {tab === "daily" ? "del día" : tab === "weekly" ? "de la semana" : "del mes"}
+                </p>
+                {r.top_products.map((p, i) => {
+                  const maxUnits = r.top_products[0].units_sold;
+                  const pct = maxUnits > 0 ? (p.units_sold / maxUnits) * 100 : 0;
+                  const color = RANK_COLORS[i] ?? "#555";
+                  return (
+                    <div
+                      key={i}
+                      className="flex items-center gap-3 py-3"
+                      style={i < r.top_products.length - 1 ? { borderBottom: "1px solid rgba(255,255,255,0.05)" } : {}}
+                    >
+                      <span className="text-xs text-[#444] font-mono w-6 flex-shrink-0">#{i + 1}</span>
+                      <span
+                        className="w-8 h-8 rounded-[8px] flex items-center justify-center text-base flex-shrink-0"
+                        style={{ background: `${color}18` }}
+                      >
+                        📦
+                      </span>
+                      <span className="text-sm text-[#f0f0f0] flex-1 truncate">{p.product_name}</span>
+                      <div className="w-20 h-1 rounded-full flex-shrink-0" style={{ background: "rgba(255,255,255,0.06)" }}>
+                        <div className="h-full rounded-full" style={{ width: `${pct}%`, background: color }} />
+                      </div>
+                      <span className="text-xs font-mono flex-shrink-0" style={{ color, minWidth: 32, textAlign: "right" }}>
+                        {p.units_sold}u
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Métodos de pago */}
+            {r.payment_methods.length > 0 && (
+              <div className="bg-[#1a1a1a] border border-white/[0.08] rounded-[14px] px-4 py-4">
+                <p className="text-xs font-semibold text-[#666] uppercase tracking-wider mb-3">
+                  Por método de pago
+                </p>
+                {r.payment_methods.map((pm, i) => {
+                  const cfg = METHOD_CFG[pm.method] ?? { label: pm.method, color: "#666" };
+                  const share = r.total_sales > 0 ? Math.round((pm.amount / r.total_sales) * 100) : 0;
+                  return (
+                    <div
+                      key={pm.method}
+                      className="py-3"
+                      style={i < r.payment_methods.length - 1 ? { borderBottom: "1px solid rgba(255,255,255,0.05)" } : {}}
+                    >
+                      <div className="flex items-center gap-2 mb-2">
+                        <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: cfg.color }} />
+                        <span className="text-sm text-[#f0f0f0] flex-1">{cfg.label}</span>
+                        <span className="text-xs text-[#555] font-mono">{pm.count} ventas</span>
+                        <span className="text-sm font-bold font-mono" style={{ color: cfg.color }}>
+                          ${pm.amount.toLocaleString("es-MX", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                        </span>
+                      </div>
+                      <div className="h-1 rounded-full w-full" style={{ background: "rgba(255,255,255,0.06)" }}>
+                        <div className="h-full rounded-full" style={{ width: `${share}%`, background: cfg.color }} />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Stock bajo */}
+            {r.low_stock_alerts.length > 0 && (
+              <div
+                className="rounded-[14px] px-4 py-4"
+                style={{ background: "rgba(255,159,67,0.06)", border: "1px solid rgba(255,159,67,0.2)" }}
+              >
+                <p className="text-xs font-semibold text-[#ff9f43] uppercase tracking-wider mb-3">
+                  ⚠ Stock bajo
+                </p>
+                {r.low_stock_alerts.map((a, i) => (
+                  <div
+                    key={a.id}
+                    className="flex justify-between py-2"
+                    style={i < r.low_stock_alerts.length - 1 ? { borderBottom: "1px solid rgba(255,255,255,0.04)" } : {}}
+                  >
+                    <span className="text-sm text-[#f0f0f0] truncate flex-1 mr-4">{a.name}</span>
+                    <span className="text-xs text-[#ff9f43] font-mono flex-shrink-0">
+                      {a.stock}/{a.low_stock_threshold} uds
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </>
+        )}
+      </div>
+
+      <Navbar />
+    </div>
+  );
+}
