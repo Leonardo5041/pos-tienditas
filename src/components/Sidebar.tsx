@@ -17,12 +17,13 @@ export default function Sidebar() {
   const { user, store, logout } = useAuthStore();
   const isDesktop   = useIsDesktop();
   const width       = isDesktop ? 260 : 220;
+  const showTrial   = store?.is_on_trial === true && store?.plan === 'free';
 
   return (
     <aside
       style={{
         position:        "fixed",
-        top:             0,
+        top:             showTrial ? 40 : 0,
         left:            0,
         bottom:          0,
         width:           width,

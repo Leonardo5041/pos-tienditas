@@ -11,7 +11,6 @@ import ProductForm from "@/components/ProductForm";
 import Modal from "@/components/Modal";
 import Navbar from "@/components/Navbar";
 import { useAuthStore } from "@/stores/authStore";
-import { useIsMobile } from "@/hooks/useBreakpoint";
 
 type StockState = "ok" | "low" | "out";
 
@@ -61,7 +60,6 @@ export default function Inventory() {
   const { user } = useAuthStore();
   const isOwner = user?.role === "owner";
   const canEdit = user?.role === "owner" || user?.role === "inventory";
-  const isMobile = useIsMobile();
 
   const { data: products = [], isLoading } = useQuery({
     queryKey: ["products", searchQuery],
@@ -158,19 +156,11 @@ export default function Inventory() {
         <BarcodeScanner onDetected={handleBarcodeScan} onClose={() => setShowScanner(false)} />
       )}
 
-      {showForm && isMobile && (
-        <ProductForm
-          product={editingProduct ?? undefined}
-          initialBarcode={scannedBarcode ?? undefined}
-          catalogData={catalogData ?? undefined}
-          onSave={handleSave}
-          onCancel={handleCancel}
-        />
-      )}
       <Modal
-        isOpen={showForm && !isMobile}
+        isOpen={showForm}
         onClose={handleCancel}
         title={editingProduct ? "Editar producto" : "Nuevo producto"}
+        maxWidth={520}
       >
         <ProductForm
           product={editingProduct ?? undefined}

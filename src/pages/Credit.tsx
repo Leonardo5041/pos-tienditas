@@ -48,7 +48,7 @@ function NewClientModal({ onClose }: { onClose: () => void }) {
             className={inputCls}
             value={name}
             onChange={(e) => setName(e.target.value.toUpperCase())}
-            placeholder="NOMBRE EN MAYÚSCULAS"
+            placeholder="Nombre (Apellido opcional)"
             autoFocus
           />
         </div>

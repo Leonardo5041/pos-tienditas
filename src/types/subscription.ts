@@ -76,4 +76,8 @@ export type SubscriptionStatus = {
   expires_at: string | null
   is_active: boolean
   subscription_id: string | null
+  effective_plan: string
+  is_on_trial: boolean
+  trial_days_left: number
+  trial_ends_at: string | null
 }

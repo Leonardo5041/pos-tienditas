@@ -50,6 +50,8 @@ export default function Subscription() {
 
   const currentPlan = status?.plan ?? 'free'
   const hasActivePlan = status?.is_active === true
+  const isOnTrial = status?.is_on_trial === true && currentPlan === 'free'
+  const trialExpired = status?.is_on_trial === false && currentPlan === 'free' && !hasActivePlan
 
   const planEmoji: Record<string, string> = {
     basico: '🏪',
@@ -87,6 +89,48 @@ export default function Subscription() {
         </div>
         <div className="w-9" />
       </div>
+
+      {/* Trial active banner */}
+      {isOnTrial && status && (
+        <div
+          className="mx-4 mb-2 rounded-[14px] px-5 py-4 flex items-center gap-4"
+          style={{ background: 'rgba(0,229,160,0.06)', border: '1px solid rgba(0,229,160,0.15)' }}
+        >
+          <span className="text-2xl flex-shrink-0">🎉</span>
+          <div className="flex-1">
+            <p className="text-sm font-semibold" style={{ color: '#00e5a0' }}>
+              Estás en tu período de prueba gratuita
+            </p>
+            <p className="text-xs mt-1" style={{ color: '#666' }}>
+              Te quedan {status.trial_days_left} días de acceso completo. Elige un plan para continuar sin interrupciones.
+            </p>
+            <div className="mt-3 h-1.5 rounded-full" style={{ background: 'rgba(255,255,255,0.06)' }}>
+              <div
+                className="h-full rounded-full transition-all duration-300"
+                style={{
+                  background: '#00e5a0',
+                  width: `${Math.round((14 - status.trial_days_left) / 14 * 100)}%`,
+                }}
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Trial expired banner */}
+      {trialExpired && (
+        <div
+          className="mx-4 mb-2 rounded-[14px] px-5 py-4"
+          style={{ background: 'rgba(255,107,107,0.08)', border: '1px solid rgba(255,107,107,0.2)' }}
+        >
+          <p className="text-sm font-semibold" style={{ color: '#ff6b6b' }}>
+            Tu período de prueba ha vencido
+          </p>
+          <p className="text-xs mt-1" style={{ color: '#666' }}>
+            Elige un plan para seguir usando Mi Tiendita POS
+          </p>
+        </div>
+      )}
 
       {/* Plan cards */}
       <div className="px-4 py-4 flex flex-col gap-4 md:grid md:grid-cols-3 md:gap-4 md:max-w-[960px] md:mx-auto">

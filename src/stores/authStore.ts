@@ -10,6 +10,12 @@ interface Store {
   id: string;
   name: string;
   slug: string;
+  plan: string;
+  effective_plan: string;
+  is_on_trial: boolean;
+  trial_days_left: number;
+  trial_ends_at: string | null;
+  has_access: boolean;
 }
 
 export interface LoginResponse {

@@ -172,6 +172,11 @@ export default function Register() {
           >
             {loading ? "Creando tu tienda..." : "Crear mi tienda →"}
           </button>
+
+          <div className="mt-4 text-center">
+            <p className="text-xs text-[#555]">🎉 14 días de prueba gratuita incluidos</p>
+            <p className="text-xs text-[#444] mt-0.5">No necesitas tarjeta de crédito</p>
+          </div>
         </form>
 
         <p className="mt-5 text-center text-sm text-[#666]">

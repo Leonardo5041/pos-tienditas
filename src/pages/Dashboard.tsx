@@ -246,6 +246,30 @@ export default function Dashboard() {
           )}
         </div>
 
+        {/* Trial vencido */}
+        {store && !store.is_on_trial && store.plan === 'free' && (
+          <div
+            className="rounded-[14px] px-5 py-4"
+            style={{ background: "rgba(255,107,107,0.08)", border: "1px solid rgba(255,107,107,0.2)" }}
+          >
+            <p className="text-sm font-semibold" style={{ color: "#ff6b6b" }}>⚠️ Tu prueba ha vencido</p>
+            <p className="text-xs mt-1" style={{ color: "#999" }}>
+              Algunas funciones están limitadas. Elige un plan para seguir vendiendo sin interrupciones.
+            </p>
+            <button
+              onClick={() => navigate("/subscription")}
+              className="mt-3 px-4 py-2 rounded-full text-sm font-semibold"
+              style={{
+                background: "rgba(255,107,107,0.15)",
+                border: "1px solid rgba(255,107,107,0.3)",
+                color: "#ff6b6b",
+              }}
+            >
+              Ver planes →
+            </button>
+          </div>
+        )}
+
         {/* CTA */}
         <button
           onClick={() => navigate("/scanner")}
