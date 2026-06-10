@@ -34,4 +34,19 @@ export const productsApi = {
     apiFetch<{ message: string }>(`/api/v1/products/${id}`, {
       method: "DELETE",
     }),
+
+  createExpress: (data: { barcode: string; name: string; price: number }) =>
+    apiFetch<{ id: string; name: string; price: number; stock: number }>("/api/v1/products/express", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+
+  getPending: () =>
+    apiFetch<Product[]>("/api/v1/products/pending"),
+
+  resolve: (id: string, data: { cost?: number; stock?: number; low_stock_threshold?: number }) =>
+    apiFetch<{ message: string }>(`/api/v1/products/${id}/resolve`, {
+      method: "PUT",
+      body: JSON.stringify(data),
+    }),
 };

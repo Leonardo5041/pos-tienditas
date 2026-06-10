@@ -1,13 +1,16 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Search, Camera, Plus, Pencil, AlertTriangle, MoreVertical, Trash2 } from "lucide-react";
 import { productsApi } from "@/lib/products";
 import { catalogApi } from "@/lib/catalog";
+import { pendingProductsDb } from "@/lib/db";
 import type { Product } from "@/types/product";
 import type { CatalogProduct } from "@/types/catalog";
+import type { PendingProductOp } from "@/types/pending-product";
 import BarcodeScanner from "@/components/BarcodeScanner";
 import ProductForm from "@/components/ProductForm";
+import PendingProductCard from "@/components/PendingProductCard";
 import Modal from "@/components/Modal";
 import Navbar from "@/components/Navbar";
 import { useAuthStore } from "@/stores/authStore";
@@ -56,15 +59,65 @@ export default function Inventory() {
   const [toast, setToast] = useState<string | null>(null);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [showOptionsSheet, setShowOptionsSheet] = useState(false);
+  const [showPendingModal, setShowPendingModal] = useState(false);
 
   const { user } = useAuthStore();
   const isOwner = user?.role === "owner";
   const canEdit = user?.role === "owner" || user?.role === "inventory";
 
-  const { data: products = [], isLoading } = useQuery({
+  const CACHE_KEY = "products_cache";
+
+  const [isOffline, setIsOffline] = useState(!navigator.onLine);
+  const [cacheVersion, setCacheVersion] = useState(0);
+  const forceRefreshCache = useCallback(() => setCacheVersion((v) => v + 1), []);
+
+  useEffect(() => {
+    const on = () => setIsOffline(false);
+    const off = () => setIsOffline(true);
+    window.addEventListener("online", on);
+    window.addEventListener("offline", off);
+    return () => {
+      window.removeEventListener("online", on);
+      window.removeEventListener("offline", off);
+    };
+  }, []);
+
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const cachedProducts = useMemo<Product[]>(() => {
+    if (!isOffline) return [];
+    try {
+      const raw = localStorage.getItem(CACHE_KEY);
+      if (!raw) return [];
+      const all: Product[] = JSON.parse(raw);
+      if (!searchQuery) return all;
+      const q = searchQuery.toLowerCase();
+      return all.filter(
+        (p) => p.name.toLowerCase().includes(q) || (p.barcode ?? "").includes(q)
+      );
+    } catch {
+      return [];
+    }
+  }, [isOffline, searchQuery, cacheVersion]);
+
+  const { data: fetchedProducts = [], isLoading } = useQuery({
     queryKey: ["products", searchQuery],
     queryFn: () => productsApi.list(searchQuery ? { search: searchQuery } : undefined),
+    enabled: !isOffline,
   });
+
+  const { data: pendingProducts = [], refetch: refetchPending } = useQuery({
+    queryKey: ["products", "pending"],
+    queryFn: productsApi.getPending,
+    enabled: !isOffline && canEdit,
+  });
+
+  useEffect(() => {
+    if (!searchQuery && fetchedProducts.length > 0) {
+      localStorage.setItem(CACHE_KEY, JSON.stringify(fetchedProducts));
+    }
+  }, [fetchedProducts, searchQuery]);
+
+  const products = isOffline ? cachedProducts : fetchedProducts;
 
   const lowStockCount = products.filter((p) => p.stock <= p.low_stock_threshold).length;
 
@@ -73,7 +126,11 @@ export default function Inventory() {
     setTimeout(() => setToast(null), 2000);
   };
 
-  const handleBarcodeScan = async (code: string) => {
+  const normalizeBarcode = (code: string) =>
+    /^\d{12}$/.test(code) ? "0" + code : code;
+
+  const handleBarcodeScan = async (rawCode: string) => {
+    const code = normalizeBarcode(rawCode);
     try {
       const product = await productsApi.getByBarcode(code);
       setEditingProduct(product);
@@ -106,8 +163,12 @@ export default function Inventory() {
     setEditingProduct(null);
     setScannedBarcode(null);
     setCatalogData(null);
-    queryClient.invalidateQueries({ queryKey: ["products"] });
-    showToast("Producto guardado");
+    if (isOffline) {
+      forceRefreshCache();
+    } else {
+      queryClient.invalidateQueries({ queryKey: ["products"] });
+    }
+    showToast(isOffline ? "Guardado sin conexión — se sincronizará al reconectarse" : "Producto guardado");
   };
 
   const confirmarEliminar = async () => {
@@ -116,6 +177,34 @@ export default function Inventory() {
       `¿Eliminar "${selectedProduct.name}"?\n\nEl producto dejará de aparecer en el inventario y no podrás escanearlo. Las ventas anteriores no se verán afectadas.`
     );
     if (!confirmado) return;
+
+    if (isOffline) {
+      try {
+        const op: PendingProductOp = {
+          id: crypto.randomUUID(),
+          type: "delete",
+          product_id: selectedProduct.id,
+          synced: false,
+          created_at: new Date().toISOString(),
+        };
+        await pendingProductsDb.add(op);
+        const raw = localStorage.getItem(CACHE_KEY);
+        if (raw) {
+          const cache: Product[] = JSON.parse(raw);
+          localStorage.setItem(
+            CACHE_KEY,
+            JSON.stringify(cache.filter((p) => p.id !== selectedProduct.id))
+          );
+        }
+        setSelectedProduct(null);
+        forceRefreshCache();
+        showToast("Eliminado sin conexión — se sincronizará al reconectarse");
+      } catch (err: unknown) {
+        alert("Error al eliminar: " + (err instanceof Error ? err.message : String(err)));
+      }
+      return;
+    }
+
     try {
       await productsApi.remove(selectedProduct.id);
       queryClient.invalidateQueries({ queryKey: ["products"] });
@@ -170,6 +259,26 @@ export default function Inventory() {
           onCancel={handleCancel}
         />
       </Modal>
+
+      {isOffline && (
+        <div className="mx-4 mt-3 flex items-center gap-2 px-3 py-2 rounded-[10px] bg-[#74b9ff]/[0.10] border border-[#74b9ff]/20">
+          <span className="text-xs font-medium text-[#74b9ff]">Sin conexión · mostrando datos guardados</span>
+        </div>
+      )}
+
+      {pendingProducts.length > 0 && (
+        <button
+          onClick={() => setShowPendingModal(true)}
+          className="mx-4 mt-3 w-[calc(100%-2rem)] flex items-center gap-2 px-3 py-2.5 rounded-[10px] text-left"
+          style={{ background: "rgba(255,217,61,0.08)", border: "1px solid rgba(255,217,61,0.25)" }}
+        >
+          <span className="text-base">⚡</span>
+          <span className="text-sm font-semibold text-[#ffd93d]">
+            {pendingProducts.length} producto{pendingProducts.length === 1 ? "" : "s"} Express pendiente{pendingProducts.length === 1 ? "" : "s"}
+          </span>
+          <span className="ml-auto text-xs text-[#ffd93d]/60">Revisar →</span>
+        </button>
+      )}
 
       <header className="px-4 pt-3 pb-3 bg-[#0f0f0f]" style={{ paddingTop: "max(0.75rem, env(safe-area-inset-top))" }}>
         <div className="flex items-center justify-between">
@@ -356,6 +465,30 @@ export default function Inventory() {
           >
             Cancelar
           </button>
+        </div>
+      </Modal>
+
+      <Modal
+        isOpen={showPendingModal}
+        onClose={() => setShowPendingModal(false)}
+        title="⚡ Productos Express"
+        maxWidth={520}
+      >
+        <p className="text-sm text-[#666] mb-4">
+          Productos creados durante ventas. Revisa costo y stock para mantener el inventario actualizado.
+        </p>
+        <div className="flex flex-col gap-3">
+          {pendingProducts.map((product) => (
+            <PendingProductCard
+              key={product.id}
+              product={product}
+              onResolved={() => {
+                refetchPending();
+                queryClient.invalidateQueries({ queryKey: ["products"] });
+                if (pendingProducts.length === 1) setShowPendingModal(false);
+              }}
+            />
+          ))}
         </div>
       </Modal>
 

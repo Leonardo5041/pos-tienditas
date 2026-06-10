@@ -2,9 +2,13 @@ import { useState } from "react";
 import { Camera, Lock, ChevronDown, ChevronUp, X, Check, Loader2 } from "lucide-react";
 import { productsApi } from "@/lib/products";
 import { catalogApi } from "@/lib/catalog";
+import { pendingProductsDb } from "@/lib/db";
 import type { Product } from "@/types/product";
 import type { CatalogProduct } from "@/types/catalog";
+import type { PendingProductOp } from "@/types/pending-product";
 import BarcodeScanner from "@/components/BarcodeScanner";
+
+const CACHE_KEY = "products_cache";
 
 interface Props {
   product?: Product;
@@ -65,20 +69,74 @@ export default function ProductForm({ product, initialBarcode, catalogData, onSa
     }
     setError(null);
     setLoading(true);
+
+    const data = {
+      barcode: barcode.trim() || undefined,
+      name: name.trim(),
+      price: parseFloat(price),
+      cost: cost ? parseFloat(cost) : undefined,
+      stock: parseInt(stock) || 0,
+      low_stock_threshold: parseInt(threshold) || 5,
+      unit,
+    };
+
     try {
-      const data = {
-        barcode: barcode.trim() || undefined,
-        name: name.trim(),
-        price: parseFloat(price),
-        cost: cost ? parseFloat(cost) : undefined,
-        stock: parseInt(stock) || 0,
-        low_stock_threshold: parseInt(threshold) || 5,
-        unit,
-      };
-      const saved = product
-        ? await productsApi.update(product.id, data)
-        : await productsApi.create(data);
-      onSave(saved);
+      if (!navigator.onLine) {
+        const cache: Product[] = (() => {
+          try { return JSON.parse(localStorage.getItem(CACHE_KEY) ?? "[]"); } catch { return []; }
+        })();
+
+        if (product) {
+          const op: PendingProductOp = {
+            id: crypto.randomUUID(),
+            type: "update",
+            product_id: product.id,
+            payload: data,
+            synced: false,
+            created_at: new Date().toISOString(),
+          };
+          await pendingProductsDb.add(op);
+          const updated: Product = {
+            ...product,
+            ...data,
+            barcode: data.barcode ?? null,
+            cost: data.cost ?? null,
+          };
+          const idx = cache.findIndex((p) => p.id === product.id);
+          if (idx >= 0) cache[idx] = updated;
+          localStorage.setItem(CACHE_KEY, JSON.stringify(cache));
+          onSave(updated);
+        } else {
+          const tempId = "tmp_" + crypto.randomUUID();
+          const op: PendingProductOp = {
+            id: crypto.randomUUID(),
+            type: "create",
+            temp_id: tempId,
+            payload: data,
+            synced: false,
+            created_at: new Date().toISOString(),
+          };
+          await pendingProductsDb.add(op);
+          const newProduct: Product = {
+            id: tempId,
+            barcode: data.barcode ?? null,
+            name: data.name,
+            price: data.price,
+            cost: data.cost ?? null,
+            stock: data.stock,
+            low_stock_threshold: data.low_stock_threshold ?? 5,
+            unit: data.unit ?? "pza",
+          };
+          cache.unshift(newProduct);
+          localStorage.setItem(CACHE_KEY, JSON.stringify(cache));
+          onSave(newProduct);
+        }
+      } else {
+        const saved = product
+          ? await productsApi.update(product.id, data)
+          : await productsApi.create(data);
+        onSave(saved);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error al guardar");
     } finally {

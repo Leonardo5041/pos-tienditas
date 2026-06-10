@@ -53,6 +53,16 @@ export default function Scanner() {
   const [lastAddedName, setLastAddedName] = useState<string | null>(null);
   const [popBadge, setPopBadge] = useState(false);
   const [catalogSheet, setCatalogSheet] = useState<CatalogProduct | null>(null);
+  const [expressPrice, setExpressPrice] = useState("");
+  const [expressLoading, setExpressLoading] = useState(false);
+  const [expressError, setExpressError] = useState<string | null>(null);
+
+  const [unknownBarcode, setUnknownBarcode] = useState<string | null>(null);
+  const [showUnknownModal, setShowUnknownModal] = useState(false);
+  const [unknownName, setUnknownName] = useState("");
+  const [unknownPrice, setUnknownPrice] = useState("");
+  const [unknownError, setUnknownError] = useState("");
+  const [isCreating, setIsCreating] = useState(false);
   const prevItemCount = useRef(0);
 
   const [searchQuery, setSearchQuery] = useState("");
@@ -72,7 +82,11 @@ export default function Scanner() {
   const total = useCartStore((s) => s.total());
   const itemCount = useCartStore((s) => s.itemCount());
 
-  const handleBarcodeScan = async (code: string) => {
+  const normalizeBarcode = (code: string) =>
+    /^\d{12}$/.test(code) ? "0" + code : code;
+
+  const handleBarcodeScan = async (rawCode: string) => {
+    const code = normalizeBarcode(rawCode);
     setFeedback({ msg: "", kind: "loading" });
     try {
       const product = await productsApi.getByBarcode(code);
@@ -90,12 +104,20 @@ export default function Scanner() {
         setFeedback(null);
         setCatalogSheet(result);
       } else {
-        setFeedback({ msg: "Producto no registrado", kind: "err" });
-        setTimeout(() => setFeedback(null), 2000);
+        setFeedback(null);
+        setUnknownBarcode(code);
+        setUnknownName("");
+        setUnknownPrice("");
+        setUnknownError("");
+        setShowUnknownModal(true);
       }
     } catch {
-      setFeedback({ msg: "Producto no registrado", kind: "err" });
-      setTimeout(() => setFeedback(null), 2000);
+      setFeedback(null);
+      setUnknownBarcode(code);
+      setUnknownName("");
+      setUnknownPrice("");
+      setUnknownError("");
+      setShowUnknownModal(true);
     }
   };
 
@@ -178,10 +200,82 @@ export default function Scanner() {
     searchRef.current?.focus();
   };
 
-  const handleAddFromCatalog = () => {
+  const handleExpressAdd = async () => {
     if (!catalogSheet) return;
-    navigate(`/inventory?barcode=${encodeURIComponent(catalogSheet.barcode)}`);
-    setCatalogSheet(null);
+    const price = parseFloat(expressPrice);
+    if (isNaN(price) || price <= 0) return;
+    setExpressLoading(true);
+    setExpressError(null);
+    try {
+      const result = await productsApi.createExpress({
+        barcode: catalogSheet.barcode,
+        name: catalogSheet.name,
+        price,
+      });
+      const product: Product = {
+        id: result.id,
+        name: result.name,
+        price: result.price,
+        stock: result.stock,
+        barcode: catalogSheet.barcode,
+        cost: null,
+        low_stock_threshold: 5,
+        unit: "pza",
+      };
+      addItem(product);
+      setLastAddedName(result.name);
+      setFeedback({ msg: `${result.name} agregado`, kind: "ok" });
+      setTimeout(() => setFeedback(null), 2000);
+      setCatalogSheet(null);
+      setExpressPrice("");
+    } catch (err) {
+      setExpressError(err instanceof Error ? err.message : "Error al agregar");
+    } finally {
+      setExpressLoading(false);
+    }
+  };
+
+  const role = user?.role ?? "";
+
+  const handleAddUnknown = async () => {
+    const price = parseFloat(unknownPrice);
+    if (role !== "cashier" && !unknownName.trim()) {
+      setUnknownError("El nombre es requerido");
+      return;
+    }
+    if (isNaN(price) || price <= 0) {
+      setUnknownError("El precio debe ser mayor a 0");
+      return;
+    }
+    setIsCreating(true);
+    setUnknownError("");
+    try {
+      const name = role === "cashier" ? "PRODUCTO " + unknownBarcode : unknownName.trim().toUpperCase();
+      const result = await productsApi.createExpress({
+        barcode: unknownBarcode ?? "",
+        name,
+        price,
+      });
+      const product: Product = {
+        id: result.id,
+        name: result.name,
+        price: result.price,
+        stock: result.stock,
+        barcode: unknownBarcode,
+        cost: null,
+        low_stock_threshold: 5,
+        unit: "pza",
+      };
+      addItem(product);
+      setLastAddedName(result.name);
+      setFeedback({ msg: `⚡ ${result.name} agregado`, kind: "ok" });
+      setTimeout(() => setFeedback(null), 2000);
+      setShowUnknownModal(false);
+    } catch (err) {
+      setUnknownError(err instanceof Error ? err.message : "Error al agregar");
+    } finally {
+      setIsCreating(false);
+    }
   };
 
   const statusLabel = error
@@ -542,7 +636,10 @@ export default function Scanner() {
   // ── Catalog sheet ───────────────────────────────────────────────────────
 
   const catalogSheetUI = (
-    <Modal isOpen={!!catalogSheet} onClose={() => setCatalogSheet(null)}>
+    <Modal
+      isOpen={!!catalogSheet}
+      onClose={() => { setCatalogSheet(null); setExpressPrice(""); setExpressError(null); }}
+    >
       <div className="mb-4">
         <p className="text-xs font-semibold text-[#00e5a0] mb-1">✓ Encontrado en catálogo nacional</p>
         <p className="text-base font-semibold text-[#f0f0f0] truncate">{catalogSheet?.name}</p>
@@ -551,19 +648,45 @@ export default function Scanner() {
         </p>
         <p className="text-xs text-[#666] font-mono mt-1">{catalogSheet?.barcode}</p>
       </div>
-      <p className="text-sm text-[#999] mb-3">Este producto no está en tu inventario.</p>
+
+      <div className="mb-4">
+        <label className="block text-xs font-semibold text-[#666] uppercase tracking-wider mb-2">
+          Precio de venta
+        </label>
+        <div className="relative">
+          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[#666] font-mono">$</span>
+          <input
+            type="number"
+            inputMode="decimal"
+            min={0}
+            step="0.01"
+            placeholder="0.00"
+            autoFocus
+            value={expressPrice}
+            onChange={(e) => setExpressPrice(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter") handleExpressAdd(); }}
+            className="w-full h-11 bg-[#242424] border border-white/[0.14] rounded-[10px] pl-7 pr-4 text-[#f0f0f0] font-mono text-base focus:outline-none focus:border-[#00e5a0]"
+          />
+        </div>
+      </div>
+
+      {expressError && (
+        <p className="text-xs text-[#ff6b6b] mb-3">{expressError}</p>
+      )}
+
       <div className="flex gap-3">
         <button
-          onClick={() => setCatalogSheet(null)}
+          onClick={() => { setCatalogSheet(null); setExpressPrice(""); setExpressError(null); }}
           className="flex-1 h-12 rounded-[10px] bg-[#242424] border border-white/[0.14] text-[#f0f0f0] font-semibold"
         >
-          Ignorar
+          Cancelar
         </button>
         <button
-          onClick={handleAddFromCatalog}
-          className="flex-1 h-12 rounded-[10px] bg-[#00e5a0] text-black font-bold"
+          onClick={handleExpressAdd}
+          disabled={expressLoading || !expressPrice || parseFloat(expressPrice) <= 0}
+          className="flex-1 h-12 rounded-[10px] bg-[#00e5a0] text-black font-bold disabled:opacity-40 disabled:cursor-not-allowed"
         >
-          Agregar al inventario
+          {expressLoading ? "Agregando..." : "⚡ Agregar al carrito"}
         </button>
       </div>
     </Modal>
@@ -726,6 +849,76 @@ export default function Scanner() {
       )}
 
       {catalogSheetUI}
+
+      <Modal
+        isOpen={showUnknownModal}
+        onClose={() => setShowUnknownModal(false)}
+        title="Producto no registrado"
+        maxWidth={380}
+      >
+        <p className="text-xs font-mono mb-4" style={{ color: "#444" }}>{unknownBarcode}</p>
+
+        <div className="flex flex-col gap-3 mb-4">
+          {role !== "cashier" && (
+            <div>
+              <label className="block text-xs font-semibold text-[#666] uppercase tracking-wider mb-2">
+                Nombre
+              </label>
+              <input
+                type="text"
+                autoFocus
+                placeholder="NOMBRE DEL PRODUCTO"
+                value={unknownName}
+                onChange={(e) => setUnknownName(e.target.value.toUpperCase())}
+                onKeyDown={(e) => { if (e.key === "Enter") handleAddUnknown(); }}
+                className="w-full h-11 bg-[#242424] border border-white/[0.14] rounded-[10px] px-4 text-[#f0f0f0] text-sm font-semibold uppercase focus:outline-none focus:border-[#00e5a0]"
+              />
+            </div>
+          )}
+
+          <div>
+            <label className="block text-xs font-semibold text-[#666] uppercase tracking-wider mb-2">
+              Precio de venta
+            </label>
+            <div className="relative">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[#666] font-mono">$</span>
+              <input
+                type="number"
+                inputMode="decimal"
+                min={0}
+                step="0.01"
+                placeholder="0.00"
+                autoFocus={role === "cashier"}
+                value={unknownPrice}
+                onChange={(e) => setUnknownPrice(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter") handleAddUnknown(); }}
+                className="w-full h-11 bg-[#242424] border border-white/[0.14] rounded-[10px] pl-7 pr-4 text-[#f0f0f0] font-mono text-base focus:outline-none focus:border-[#00e5a0]"
+              />
+            </div>
+          </div>
+        </div>
+
+        {unknownError && (
+          <p className="text-xs text-[#ff6b6b] mb-3">{unknownError}</p>
+        )}
+
+        <div className="flex gap-3">
+          <button
+            onClick={() => setShowUnknownModal(false)}
+            className="flex-1 h-12 rounded-[10px] bg-[#242424] border border-white/[0.14] text-[#f0f0f0] font-semibold"
+          >
+            Cancelar
+          </button>
+          <button
+            onClick={handleAddUnknown}
+            disabled={isCreating}
+            className="flex-1 h-12 rounded-[10px] bg-[#00e5a0] text-black font-bold disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            {isCreating ? "Agregando..." : "⚡ Agregar"}
+          </button>
+        </div>
+      </Modal>
+
       <Navbar />
     </div>
   );

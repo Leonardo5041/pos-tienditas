@@ -48,7 +48,7 @@ export default function Payment() {
           id: crypto.randomUUID(),
           items: input.items,
           payment_method: input.payment_method,
-          created_at: new Date().toISOString(),
+          created_at: new Date().toLocaleString("sv-SE", { timeZone: "America/Mexico_City" }).replace("T", " "),
           synced: false,
         };
         await pendingSalesDb.add(pendingSale);

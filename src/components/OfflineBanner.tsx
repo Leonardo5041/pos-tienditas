@@ -1,13 +1,19 @@
 import { useState, useEffect } from "react";
 import { useOfflineSync } from "@/hooks/useOfflineSync";
+import { useProductSync } from "@/hooks/useProductSync";
 import { WifiOff, RefreshCw } from "lucide-react";
 import { useBreakpoint } from "@/hooks/useBreakpoint";
 
 export default function OfflineBanner() {
   const [isOnline, setIsOnline] = useState(navigator.onLine);
-  const { pendingCount, isSyncing, syncedMessage } = useOfflineSync();
+  const { pendingCount: pendingSales, isSyncing: syncingSales, syncedMessage: salesMsg } = useOfflineSync();
+  const { pendingCount: pendingProducts, isSyncing: syncingProducts, syncedMessage: productsMsg } = useProductSync();
   const bp = useBreakpoint();
   const leftOffset = bp === "desktop" ? 260 : bp === "tablet" ? 220 : 0;
+
+  const totalPending = pendingSales + pendingProducts;
+  const isSyncing = syncingSales || syncingProducts;
+  const syncedMessage = salesMsg ?? productsMsg;
 
   useEffect(() => {
     const setOnline = () => setIsOnline(true);
@@ -20,7 +26,7 @@ export default function OfflineBanner() {
     };
   }, []);
 
-  if (isOnline && !isSyncing && !syncedMessage && pendingCount === 0) return null;
+  if (isOnline && !isSyncing && !syncedMessage && totalPending === 0) return null;
 
   const bannerStyle = { left: leftOffset };
 
@@ -29,8 +35,8 @@ export default function OfflineBanner() {
       <div className="fixed top-0 right-0 z-50 bg-red-600 text-white px-4 py-2 flex items-center gap-2 text-sm transition-all" style={bannerStyle}>
         <WifiOff size={16} />
         <span>
-          Sin conexión — las ventas se guardan localmente
-          {pendingCount > 0 && ` (${pendingCount} pendientes)`}
+          Sin conexión — los cambios se guardan localmente
+          {totalPending > 0 && ` (${totalPending} pendientes)`}
         </span>
       </div>
     );
@@ -40,7 +46,7 @@ export default function OfflineBanner() {
     return (
       <div className="fixed top-0 right-0 z-50 bg-amber-500 text-white px-4 py-2 flex items-center gap-2 text-sm transition-all" style={bannerStyle}>
         <RefreshCw size={16} className="animate-spin" />
-        <span>Sincronizando {pendingCount} {pendingCount === 1 ? "venta" : "ventas"}...</span>
+        <span>Sincronizando {totalPending} {totalPending === 1 ? "cambio" : "cambios"}...</span>
       </div>
     );
   }
