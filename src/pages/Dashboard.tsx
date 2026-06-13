@@ -247,7 +247,7 @@ export default function Dashboard() {
                     labelFormatter={(h) => h + ":00 hrs"}
                   />
                   <Bar dataKey="amount" radius={[3, 3, 0, 0]} maxBarSize={18}>
-                    {report.sales_by_hour.map((entry, i) => (
+                    {(report.sales_by_hour ?? []).map((entry, i) => (
                       <Cell
                         key={i}
                         fill={entry.hour === currentHour ? "#00e5a0" : "rgba(0,229,160,0.25)"}
