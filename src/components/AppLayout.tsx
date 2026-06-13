@@ -11,12 +11,17 @@ export default function AppLayout() {
 
   if (bp === "mobile") {
     return (
-      <>
+      <div style={{
+        minHeight: '100vh',
+        background: '#0f0f0f',
+        paddingTop: 'env(safe-area-inset-top)',
+        paddingBottom: '64px',
+      }}>
         <TrialBanner />
         <div style={{ paddingTop: showTrial ? '40px' : '0' }}>
           <Outlet />
         </div>
-      </>
+      </div>
     );
   }
 

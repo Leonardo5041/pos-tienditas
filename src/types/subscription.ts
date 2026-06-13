@@ -24,11 +24,11 @@ export const PLANS: PlanConfig[] = [
     period_tag: 'Mensual',
     highlight: false,
     features: [
-      'Ventas de alta velocidad con escáner',
-      'Ventas a granel con decimales',
-      'Inventario básico',
-      'Reportes diarios de caja',
-      'Modo offline garantizado',
+      'Ventas con escáner de código de barras',
+      'Historial de ventas y reportes',
+      'Alertas de stock mínimo',
+      'Fiado integrado (crédito a clientes)',
+      'Cajeros adicionales',
     ],
   },
   {
@@ -43,10 +43,9 @@ export const PLANS: PlanConfig[] = [
     highlight: true,
     features: [
       'Todo lo del Plan Básico',
-      'Alertas de stock mínimo',
-      'Venta en negativo para horas pico',
-      'Reportes avanzados de ganancias',
-      'Multi-cajero para empleados',
+      'Control de caja y cortes de turno',
+      'Registro de gastos por turno',
+      'Reporte de rentabilidad por turno',
     ],
   },
   {
@@ -61,10 +60,9 @@ export const PLANS: PlanConfig[] = [
     highlight: false,
     features: [
       'Todo lo del Plan Recomendado',
-      'Fiado integrado (gestión de créditos)',
-      'Bloqueo de seguridad por turno de cajero',
-      'Usuarios ilimitados',
-      'Soporte prioritario',
+      'Soporte prioritario vía WhatsApp',
+      'Acceso anticipado a nuevas funciones',
+      'Precio fijo garantizado de por vida',
     ],
   },
 ]

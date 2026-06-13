@@ -4,6 +4,8 @@ import { BarChart, Bar, XAxis, YAxis, Cell, ResponsiveContainer, Tooltip } from 
 import { useAuthStore } from "@/stores/authStore";
 import { reportsApi } from "@/lib/reports";
 import { salesApi } from "@/lib/sales";
+import { expensesApi } from "@/lib/expenses";
+import { registersApi } from "@/lib/registers";
 import Navbar from "@/components/Navbar";
 
 const roleLabel: Record<string, string> = {
@@ -19,13 +21,7 @@ const paymentConfig: Record<string, { label: string; color: string }> = {
 };
 
 function relativeTime(s: string) {
-  const mxNow = new Date();
-  // Eliminamos la 'Z' (si viene) para forzar al navegador a leerlo como hora local de México
-  const cleanString = s.replace("Z", "").replace(" ", "T");
-  const stored = new Date(cleanString); 
-
-  const diff = (mxNow.getTime() - stored.getTime()) / 1000 / 60; // en minutos
-  
+  const diff = (Date.now() - new Date(s).getTime()) / 1000 / 60;
   if (diff < 1) return "Hace un momento";
   if (diff < 60) return `Hace ${Math.floor(diff)} min`;
   return `Hace ${Math.floor(diff / 60)} h`;
@@ -65,6 +61,30 @@ export default function Dashboard() {
   const salesPct   = report ? pctDiff(report.total_sales,       report.yesterday_total) : null;
   const countDiff  = report ? report.transaction_count - report.yesterday_count : null;
 
+  const qualifiesForProfit = user?.role === "owner" &&
+    ["recomendado", "oro"].includes(store?.effective_plan ?? "");
+
+  const todayStr    = new Date().toLocaleDateString("sv", { timeZone: "America/Mexico_City" });
+  const tomorrowStr = (() => {
+    const d = new Date();
+    d.setDate(d.getDate() + 1);
+    return d.toLocaleDateString("sv", { timeZone: "America/Mexico_City" });
+  })();
+
+  const { data: currentRegister } = useQuery({
+    queryKey: ["registers", "current"],
+    queryFn:  registersApi.current,
+    enabled:  qualifiesForProfit,
+    refetchInterval: 30000,
+  });
+
+  const { data: profitData } = useQuery({
+    queryKey: ["expenses", "summary", "today", todayStr],
+    queryFn: () => expensesApi.summary({ from: todayStr, to: tomorrowStr }),
+    enabled: qualifiesForProfit,
+    refetchInterval: 30000,
+  });
+
   return (
     <div className="min-h-screen bg-[#0f0f0f] pb-24">
       {/* Header */}
@@ -78,13 +98,28 @@ export default function Dashboard() {
             {user?.role ? <> · <span className="text-[#555]">{roleLabel[user.role] ?? user.role}</span></> : null}
           </p>
         </div>
-        <button
-          onClick={() => navigate("/settings")}
-          className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold text-[#00e5a0]"
-          style={{ background: "rgba(0,229,160,0.1)", border: "1.5px solid rgba(0,229,160,0.25)" }}
-        >
-          {initials(user?.name)}
-        </button>
+        <div className="flex flex-col items-end gap-2">
+          <button
+            onClick={() => navigate("/settings")}
+            className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold text-[#00e5a0]"
+            style={{ background: "rgba(0,229,160,0.1)", border: "1.5px solid rgba(0,229,160,0.25)" }}
+          >
+            {initials(user?.name)}
+          </button>
+          {currentRegister && (
+            <button
+              onClick={() => navigate("/registers")}
+              className="flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold"
+              style={{
+                background: "rgba(0,229,160,0.1)",
+                border:     "1px solid rgba(0,229,160,0.2)",
+                color:      "#00e5a0",
+              }}
+            >
+              <span className="animate-pulse">●</span> Turno activo
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="px-4 flex flex-col gap-3">
@@ -99,22 +134,62 @@ export default function Dashboard() {
 
         {report && (
           <>
-            {/* Ventas hoy */}
-            <div
-              className="rounded-[16px] px-5 py-4"
-              style={{ background: "rgba(0,229,160,0.06)", border: "1px solid rgba(0,229,160,0.15)" }}
-            >
-              <p className="text-xs font-semibold text-[#00e5a0] uppercase tracking-widest mb-1">Ventas hoy</p>
-              <p className="text-4xl font-bold text-[#f0f0f0] font-mono">
-                ${report.total_sales.toLocaleString("es-MX", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
-              </p>
-              {salesPct !== null && (
-                <p className="text-sm mt-1" style={{ color: salesPct >= 0 ? "#00e5a0" : "#ff6b6b" }}>
-                  {salesPct >= 0 ? "↑" : "↓"} {Math.abs(salesPct)}% vs ayer
+            {/* Ventas hoy + Ganancia hoy */}
+            <div className={qualifiesForProfit ? "grid grid-cols-2 gap-3" : ""}>
+              {/* Ventas hoy */}
+              <div
+                className="rounded-[16px] px-4 py-4"
+                style={{ background: "rgba(0,229,160,0.06)", border: "1px solid rgba(0,229,160,0.15)" }}
+              >
+                <p className="text-xs font-semibold text-[#00e5a0] uppercase tracking-widest mb-1">Ventas hoy</p>
+                <p className={`font-bold text-[#f0f0f0] font-mono ${qualifiesForProfit ? "text-2xl" : "text-4xl"}`}>
+                  ${report.total_sales.toLocaleString("es-MX", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
                 </p>
-              )}
-              {salesPct === null && report.yesterday_total === 0 && (
-                <p className="text-xs text-[#444] mt-1">Sin datos de ayer</p>
+                {salesPct !== null && (
+                  <p className="text-xs mt-1" style={{ color: salesPct >= 0 ? "#00e5a0" : "#ff6b6b" }}>
+                    {salesPct >= 0 ? "↑" : "↓"} {Math.abs(salesPct)}% vs ayer
+                  </p>
+                )}
+                {salesPct === null && report.yesterday_total === 0 && (
+                  <p className="text-xs text-[#444] mt-1">Sin datos de ayer</p>
+                )}
+              </div>
+
+              {/* Ganancia hoy — solo owner plan recomendado/oro */}
+              {qualifiesForProfit && (
+                <div
+                  className="rounded-[16px] px-4 py-4 relative overflow-hidden"
+                  style={{
+                    background: "linear-gradient(135deg, rgba(0,229,160,0.13) 0%, rgba(0,229,160,0.05) 100%)",
+                    border:     "1.5px solid rgba(0,229,160,0.35)",
+                    boxShadow:  "0 0 24px rgba(0,229,160,0.08)",
+                  }}
+                >
+                  <div
+                    className="absolute -top-4 -right-4 w-20 h-20 rounded-full pointer-events-none"
+                    style={{ background: "rgba(0,229,160,0.15)", filter: "blur(16px)" }}
+                  />
+                  <p className="text-[10px] font-bold uppercase tracking-widest mb-1" style={{ color: "rgba(0,229,160,0.55)" }}>
+                    💰 Ganancia
+                  </p>
+                  {profitData ? (
+                    <>
+                      <p
+                        className="text-2xl font-black font-mono leading-tight"
+                        style={{ color: "#00e5a0", textShadow: "0 0 16px rgba(0,229,160,0.45)" }}
+                      >
+                        ${profitData.profit.toLocaleString("es-MX", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                      </p>
+                      {profitData.total_sales > 0 && profitData.profit > 0 && (
+                        <p className="text-xs mt-1 font-bold" style={{ color: "#00e5a0" }}>
+                          {Math.round((profitData.profit / profitData.total_sales) * 100)}% margen
+                        </p>
+                      )}
+                    </>
+                  ) : (
+                    <p className="text-2xl font-black font-mono text-[#2a2a2a] leading-tight">$—</p>
+                  )}
+                </div>
               )}
             </div>
 

@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { reportsApi } from "@/lib/reports";
 import type { DailyReport } from "@/types/report";
 import Navbar from "@/components/Navbar";
+import { useAuthStore } from "@/stores/authStore";
 
 type Tab = "daily" | "weekly" | "monthly";
 
@@ -35,8 +36,55 @@ function getPeriodComparison(tab: Tab, report: DailyReport & Record<string, numb
   return { prev: report.last_period_total ?? 0, prevCount: report.last_period_count ?? 0, label: "mes ant." };
 }
 
+function CashierDailyView() {
+  const { data: report, isLoading } = useQuery({
+    queryKey: ["reports", "daily"],
+    queryFn: reportsApi.daily,
+  });
+  const r = report as (DailyReport & Record<string, number>) | undefined;
+
+  return (
+    <div className="min-h-screen bg-[#0f0f0f] pb-24">
+      <div className="px-4 pt-5 pb-3">
+        <h1 className="text-2xl font-bold text-[#f0f0f0] mb-4">Reportes</h1>
+      </div>
+      <div className="px-4 pb-4">
+        {isLoading && (
+          <div className="bg-[#1a1a1a] animate-pulse rounded-[16px]" style={{ height: 160 }} />
+        )}
+        {r && (
+          <div className="bg-[#1a1a1a] rounded-[16px] p-5 text-center">
+            <p className="text-xs text-[#666] uppercase tracking-widest mb-3">Tus ventas de hoy</p>
+            <p className="text-4xl font-bold font-mono" style={{ color: "#00e5a0" }}>
+              ${r.total_sales.toLocaleString("es-MX", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </p>
+            <div className="grid grid-cols-2 gap-3 mt-4">
+              <div>
+                <p className="text-xs text-[#666] uppercase tracking-wider mb-1">Transacciones</p>
+                <p className="text-xl font-bold text-[#f0f0f0]">{r.transaction_count}</p>
+              </div>
+              <div>
+                <p className="text-xs text-[#666] uppercase tracking-wider mb-1">Ticket prom.</p>
+                <p className="text-xl font-bold font-mono text-[#f0f0f0]">
+                  ${r.avg_ticket.toLocaleString("es-MX", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+      <Navbar />
+    </div>
+  );
+}
+
 export default function Reports() {
+  const { user } = useAuthStore();
   const [tab, setTab] = useState<Tab>("daily");
+
+  if (user?.role === "cashier") {
+    return <CashierDailyView />;
+  }
 
   const queryFn = tab === "daily" ? reportsApi.daily : tab === "weekly" ? reportsApi.weekly : reportsApi.monthly;
   const { data: report, isLoading } = useQuery({

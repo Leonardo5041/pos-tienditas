@@ -21,16 +21,9 @@ export default function Receipt() {
 
   const { sale, offline } = state;
 
-  // created_at is stored as Mexico City time string — parse directly, no timezone conversion
-  const raw = sale.created_at.replace("T", " ");
-  const [datePart, timePart = "00:00:00"] = raw.split(" ");
-  const [year, month, day] = datePart.split("-").map(Number);
-  const [hour, minute] = timePart.split(":").map(Number);
-  const MONTHS = ["ene","feb","mar","abr","may","jun","jul","ago","sep","oct","nov","dic"];
-  const h12 = hour % 12 || 12;
-  const ampm = hour < 12 ? "a.m." : "p.m.";
-  const time = `${h12}:${String(minute).padStart(2, "0")} ${ampm}`;
-  const dateStr = `${String(day).padStart(2, "0")} ${MONTHS[month - 1]} ${year}`;
+  const _saleDate = new Date(sale.created_at);
+  const time = _saleDate.toLocaleString("es-MX", { timeZone: "America/Mexico_City", hour: "2-digit", minute: "2-digit", hour12: true });
+  const dateStr = _saleDate.toLocaleString("es-MX", { timeZone: "America/Mexico_City", day: "2-digit", month: "short", year: "numeric" });
   const shortId = sale.id.slice(0, 8).toUpperCase();
   const payLabel = paymentLabels[sale.payment_method] ?? sale.payment_method;
 

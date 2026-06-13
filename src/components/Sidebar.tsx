@@ -1,15 +1,17 @@
 import { useNavigate, useLocation } from "react-router-dom";
-import { Home, ShoppingCart, Package, BookOpen, BarChart2, Settings, LogOut } from "lucide-react";
+import { Home, ShoppingCart, Package, BookOpen, BarChart2, Settings, LogOut, Wallet, DollarSign } from "lucide-react";
 import { useAuthStore } from "@/stores/authStore";
 import { useIsDesktop } from "@/hooks/useBreakpoint";
 
-const NAV_ITEMS = [
-  { path: "/dashboard", icon: Home,          label: "Inicio" },
-  { path: "/scanner",   icon: ShoppingCart,  label: "Vender" },
-  { path: "/inventory", icon: Package,       label: "Inventario" },
-  { path: "/credit",    icon: BookOpen,      label: "Fiado" },
-  { path: "/reports",   icon: BarChart2,     label: "Reportes" },
-] as const;
+const BASE_NAV_ITEMS = [
+  { path: "/dashboard", icon: Home,          label: "Inicio",     ownerOnly: false },
+  { path: "/scanner",   icon: ShoppingCart,  label: "Vender",     ownerOnly: false },
+  { path: "/inventory", icon: Package,       label: "Inventario", ownerOnly: false },
+  { path: "/credit",    icon: BookOpen,      label: "Fiado",      ownerOnly: false },
+  { path: "/expenses",   icon: Wallet,       label: "Gastos",     ownerOnly: false },
+  { path: "/registers",  icon: DollarSign,   label: "Caja",       ownerOnly: false },
+  { path: "/reports",    icon: BarChart2,    label: "Reportes",   ownerOnly: false },
+];
 
 export default function Sidebar() {
   const navigate    = useNavigate();
@@ -17,6 +19,8 @@ export default function Sidebar() {
   const { user, store, logout } = useAuthStore();
   const isDesktop   = useIsDesktop();
   const width       = isDesktop ? 260 : 220;
+  const isOwner     = user?.role === "owner";
+  const NAV_ITEMS   = BASE_NAV_ITEMS.filter((item) => !item.ownerOnly || isOwner);
   const showTrial   = store?.is_on_trial === true && store?.plan === 'free';
 
   return (

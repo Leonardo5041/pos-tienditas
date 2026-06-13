@@ -12,6 +12,8 @@ import Reports from "@/pages/Reports";
 import Payment from "@/pages/Payment";
 import Receipt from "@/pages/Receipt";
 import Credit from "@/pages/Credit";
+import Expenses from "@/pages/Expenses";
+import CashRegister from "@/pages/CashRegister";
 
 import Settings from "@/pages/Settings";
 import Subscription from "@/pages/Subscription";
@@ -39,6 +41,8 @@ export default function App() {
             <Route path="/scanner" element={<Scanner />} />
             <Route path="/inventory" element={<Inventory />} />
             <Route path="/credit" element={<Credit />} />
+            <Route path="/expenses" element={<Expenses />} />
+            <Route path="/registers" element={<CashRegister />} />
             <Route path="/reports" element={<Reports />} />
             <Route path="/payment" element={<Payment />} />
             <Route path="/receipt" element={<Receipt />} />
