@@ -58,8 +58,8 @@ export default function Dashboard() {
 
   const recentSales = recentData?.sales ?? [];
 
-  const salesPct   = report ? pctDiff(report.total_sales,       report.yesterday_total) : null;
-  const countDiff  = report ? report.transaction_count - report.yesterday_count : null;
+  const salesPct   = report ? pctDiff(report.total_sales, report.yesterday_total ?? 0) : null;
+  const countDiff  = report ? report.transaction_count - (report.yesterday_count ?? 0) : null;
 
   const qualifiesForProfit = user?.role === "owner" &&
     ["recomendado", "oro"].includes(store?.effective_plan ?? "");
@@ -225,7 +225,7 @@ export default function Dashboard() {
                 </button>
               </div>
               <ResponsiveContainer width="100%" height={120}>
-                <BarChart data={report.sales_by_hour} margin={{ top: 0, right: 0, left: 0, bottom: 0 }}>
+                <BarChart data={report.sales_by_hour ?? []} margin={{ top: 0, right: 0, left: 0, bottom: 0 }}>
                   <XAxis
                     dataKey="hour"
                     tick={{ fill: "#444", fontSize: 10 }}
@@ -259,7 +259,7 @@ export default function Dashboard() {
             </div>
 
             {/* Stock bajo */}
-            {report.low_stock_alerts.length > 0 && (
+            {(report.low_stock_alerts ?? []).length > 0 && (
               <button
                 onClick={() => navigate("/inventory")}
                 className="w-full rounded-[14px] px-4 py-3 flex items-start gap-3 text-left"
