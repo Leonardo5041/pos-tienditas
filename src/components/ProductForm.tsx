@@ -76,7 +76,7 @@ export default function ProductForm({ product, initialBarcode, catalogData, onSa
       price: parseFloat(price),
       cost: cost ? parseFloat(cost) : undefined,
       stock: parseInt(stock) || 0,
-      low_stock_threshold: parseInt(threshold) || 5,
+      low_stock_threshold: parseFloat(threshold) || 5,
       unit,
     };
 
@@ -250,10 +250,11 @@ export default function ProductForm({ product, initialBarcode, catalogData, onSa
             <input
               type="number"
               min="0"
+              step={unit === "pza" ? "1" : "0.001"}
               className={inputCls + " font-mono"}
               value={threshold}
               onChange={(e) => setThreshold(e.target.value)}
-              placeholder="5"
+              placeholder={unit === "pza" ? "5" : "0.5"}
             />
           </div>
         </div>

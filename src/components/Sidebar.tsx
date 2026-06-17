@@ -1,16 +1,19 @@
 import { useNavigate, useLocation } from "react-router-dom";
-import { Home, ShoppingCart, Package, BookOpen, BarChart2, Settings, LogOut, Wallet, DollarSign } from "lucide-react";
+import { Home, ShoppingCart, Package, BookOpen, BarChart2, Settings, LogOut, Wallet, DollarSign, FileText } from "lucide-react";
 import { useAuthStore } from "@/stores/authStore";
 import { useIsDesktop } from "@/hooks/useBreakpoint";
 
-const BASE_NAV_ITEMS = [
-  { path: "/dashboard", icon: Home,          label: "Inicio",     ownerOnly: false },
-  { path: "/scanner",   icon: ShoppingCart,  label: "Vender",     ownerOnly: false },
-  { path: "/inventory", icon: Package,       label: "Inventario", ownerOnly: false },
-  { path: "/credit",    icon: BookOpen,      label: "Fiado",      ownerOnly: false },
-  { path: "/expenses",   icon: Wallet,       label: "Gastos",     ownerOnly: false },
-  { path: "/registers",  icon: DollarSign,   label: "Caja",       ownerOnly: false },
-  { path: "/reports",    icon: BarChart2,    label: "Reportes",   ownerOnly: false },
+type NavRole = "all" | "owner" | "owner_inventory";
+
+const BASE_NAV_ITEMS: { path: string; icon: React.ElementType; label: string; roles: NavRole }[] = [
+  { path: "/dashboard", icon: Home,          label: "Inicio",     roles: "all" },
+  { path: "/scanner",   icon: ShoppingCart,  label: "Vender",     roles: "all" },
+  { path: "/inventory", icon: Package,       label: "Inventario", roles: "all" },
+  { path: "/receipts",  icon: FileText,      label: "Tickets",    roles: "owner_inventory" },
+  { path: "/credit",    icon: BookOpen,      label: "Fiado",      roles: "all" },
+  { path: "/expenses",   icon: Wallet,       label: "Gastos",     roles: "all" },
+  { path: "/registers",  icon: DollarSign,   label: "Caja",       roles: "all" },
+  { path: "/reports",    icon: BarChart2,    label: "Reportes",   roles: "all" },
 ];
 
 export default function Sidebar() {
@@ -19,9 +22,14 @@ export default function Sidebar() {
   const { user, store, logout } = useAuthStore();
   const isDesktop   = useIsDesktop();
   const width       = isDesktop ? 260 : 220;
-  const isOwner     = user?.role === "owner";
-  const NAV_ITEMS   = BASE_NAV_ITEMS.filter((item) => !item.ownerOnly || isOwner);
-  const showTrial   = store?.is_on_trial === true && store?.plan === 'free';
+  const role        = user?.role;
+  const NAV_ITEMS   = BASE_NAV_ITEMS.filter((item) => {
+    if (item.roles === "all") return true;
+    if (item.roles === "owner") return role === "owner";
+    if (item.roles === "owner_inventory") return role === "owner" || role === "inventory";
+    return false;
+  });
+  const showTrial   = store?.is_on_trial === true && store?.plan === "free";
 
   return (
     <aside

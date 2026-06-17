@@ -5,39 +5,44 @@ export function TrialBanner() {
   const { store } = useAuthStore()
   const navigate = useNavigate()
 
-  if (!store?.is_on_trial) return null
-  if (store.plan !== 'free') return null
+  const trialExpired = !store?.is_on_trial && store?.effective_plan === 'free'
+
+  if (!store?.is_on_trial && !trialExpired) return null
+  if (store?.plan !== 'free') return null
 
   const days = store.trial_days_left
 
-  const isUrgent = days <= 3
-  const isWarning = days <= 7 && days > 3
+  const isExpired = trialExpired
+  const isUrgent  = !isExpired && days <= 3
+  const isWarning = !isExpired && days <= 7 && days > 3
 
-  const bg = isUrgent
+  const bg = isExpired || isUrgent
     ? 'rgba(255,107,107,0.12)'
     : isWarning
       ? 'rgba(255,159,67,0.12)'
       : 'rgba(0,229,160,0.08)'
 
-  const borderColor = isUrgent
+  const borderColor = isExpired || isUrgent
     ? 'rgba(255,107,107,0.3)'
     : isWarning
       ? 'rgba(255,159,67,0.3)'
       : 'rgba(0,229,160,0.2)'
 
-  const color = isUrgent
+  const color = isExpired || isUrgent
     ? '#ff6b6b'
     : isWarning
       ? '#ff9f43'
       : '#00e5a0'
 
-  const icon = isUrgent ? '⚠️' : '🎉'
+  const icon = isExpired || isUrgent ? '⚠️' : '🎉'
 
-  const message = days === 0
-    ? 'Tu prueba vence hoy'
-    : days === 1
-      ? 'Tu prueba vence mañana'
-      : `${days} días de prueba restantes`
+  const message = isExpired
+    ? 'Tu prueba ha terminado · Activa un plan para continuar'
+    : days === 0
+      ? 'Tu prueba vence hoy'
+      : days === 1
+        ? 'Tu prueba vence mañana'
+        : `${days} días de prueba restantes`
 
   return (
     <div style={{
@@ -77,7 +82,7 @@ export function TrialBanner() {
           fontFamily:   'DM Sans, sans-serif',
         }}
       >
-        {isUrgent ? '¡Suscríbete ahora!' : 'Ver planes'}
+        {isExpired || isUrgent ? '¡Suscríbete ahora!' : 'Ver planes'}
       </button>
     </div>
   )

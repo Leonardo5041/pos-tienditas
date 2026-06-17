@@ -2,6 +2,7 @@ import { useLocation, useNavigate, Navigate } from "react-router-dom";
 import { useAuthStore } from "@/stores/authStore";
 import type { Sale } from "@/types/sale";
 
+
 type ReceiptState = { sale: Sale; offline: boolean } | null;
 
 const paymentLabels: Record<string, string> = {
@@ -20,7 +21,6 @@ export default function Receipt() {
   if (!state?.sale) return <Navigate to="/dashboard" replace />;
 
   const { sale, offline } = state;
-
   const _saleDate = new Date(sale.created_at);
   const time = _saleDate.toLocaleString("es-MX", { timeZone: "America/Mexico_City", hour: "2-digit", minute: "2-digit", hour12: true });
   const dateStr = _saleDate.toLocaleString("es-MX", { timeZone: "America/Mexico_City", day: "2-digit", month: "short", year: "numeric" });
@@ -152,6 +152,37 @@ export default function Receipt() {
             Ir al inicio
           </button>
         </div>
+      </div>
+
+      {/* Ticket térmico — solo visible al imprimir */}
+      <div id="thermal-receipt" style={{ display: "none" }}>
+        <div className="r-center r-bold" style={{ fontSize: 13 }}>{store?.name ?? "Mi Tienda"}</div>
+        <div className="r-center r-muted">{dateStr} {time}</div>
+        <div className="r-center r-muted">Cajero: {user?.name ?? "—"}</div>
+        <div className="r-line" />
+
+        {sale.items.map((item, i) => (
+          <div key={i}>
+            <div className="r-bold">{item.product_name}</div>
+            <div className="r-row">
+              <span className="r-muted">x{item.quantity} × ${item.unit_price.toFixed(2)}</span>
+              <span>${(item.subtotal ?? item.unit_price * item.quantity).toFixed(2)}</span>
+            </div>
+          </div>
+        ))}
+
+        <div className="r-line" />
+        <div className="r-row r-large">
+          <span>TOTAL</span>
+          <span>${sale.total.toFixed(2)}</span>
+        </div>
+        <div className="r-row r-muted" style={{ marginTop: 2 }}>
+          <span>Forma de pago</span>
+          <span>{payLabel}</span>
+        </div>
+        <div className="r-line" />
+        <div className="r-center r-muted">Ref: #{shortId}</div>
+        <div className="r-center r-muted" style={{ marginTop: 4 }}>¡Gracias por su compra!</div>
       </div>
     </div>
   );

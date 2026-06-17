@@ -8,7 +8,7 @@ type Props = {
 };
 
 export default function PendingProductCard({ product, onResolved }: Props) {
-  const [cost, setCost] = useState("");
+  const [cost, setCost] = useState(product.cost ? String(product.cost) : "");
   const [stock, setStock] = useState(String(product.stock));
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -19,7 +19,7 @@ export default function PendingProductCard({ product, onResolved }: Props) {
     try {
       const data: { cost?: number; stock?: number } = {};
       const costNum = parseFloat(cost);
-      const stockNum = parseInt(stock, 10);
+      const stockNum = parseFloat(stock);
       if (!isNaN(costNum) && cost.trim() !== "") data.cost = costNum;
       if (!isNaN(stockNum)) data.stock = stockNum;
       await productsApi.resolve(product.id, data);
@@ -87,9 +87,9 @@ export default function PendingProductCard({ product, onResolved }: Props) {
           </label>
           <input
             type="number"
-            inputMode="numeric"
+            inputMode="decimal"
             min={0}
-            step={1}
+            step="any"
             value={stock}
             onChange={(e) => setStock(e.target.value)}
             style={{

@@ -18,28 +18,80 @@ import Modal from "@/components/Modal";
 
 type Feedback = { msg: string; kind: "ok" | "err" | "loading" } | null;
 
-function BulkQtyInput({ value, unit, onChange }: { value: number; unit: string; onChange: (v: number) => void }) {
-  const [str, setStr] = useState(String(value));
-  useEffect(() => { setStr(String(value)); }, [value]);
+function BulkQtyInput({ value, unit, price, onChange }: { value: number; unit: string; price: number; onChange: (v: number) => void }) {
+  const [qtyStr, setQtyStr] = useState(String(value));
+  const [amtStr, setAmtStr] = useState((value * price).toFixed(2));
+  const editingAmt = useRef(false);
+
+  useEffect(() => {
+    setQtyStr(String(value));
+    if (!editingAmt.current) setAmtStr((value * price).toFixed(2));
+  }, [value, price]);
+
+  const handleQtyChange = (raw: string) => {
+    setQtyStr(raw);
+    const v = parseFloat(raw);
+    if (!isNaN(v) && v > 0) {
+      setAmtStr((v * price).toFixed(2));
+      onChange(v);
+    }
+  };
+
+  const handleAmtChange = (raw: string) => {
+    setAmtStr(raw);
+    const amt = parseFloat(raw);
+    if (!isNaN(amt) && amt > 0 && price > 0) {
+      const decimals = unit === "g" ? 0 : 3;
+      const qty = parseFloat((amt / price).toFixed(decimals));
+      if (qty > 0) {
+        setQtyStr(String(qty));
+        onChange(qty);
+      }
+    }
+  };
+
+  const qtyStep = unit === "g" ? "1" : "0.001";
+  const qtyMin  = unit === "g" ? "1" : "0.001";
+
   return (
-    <div className="flex items-center gap-1">
-      <input
-        type="number"
-        min="0.001"
-        step="0.001"
-        value={str}
-        onChange={(e) => {
-          setStr(e.target.value);
-          const v = parseFloat(e.target.value);
-          if (!isNaN(v) && v > 0) onChange(v);
-        }}
-        onBlur={() => {
-          const v = parseFloat(str);
-          if (isNaN(v) || v <= 0) { setStr(String(value)); }
-        }}
-        className="w-20 h-7 rounded-[6px] bg-[#242424] border border-white/[0.14] text-[#f0f0f0] text-sm font-bold font-mono text-center focus:border-[#00e5a0] focus:outline-none"
-      />
-      <span className="text-xs text-[#666]">{unit}</span>
+    <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+        <input
+          type="number"
+          inputMode="decimal"
+          min={qtyMin}
+          step={qtyStep}
+          value={qtyStr}
+          onChange={(e) => handleQtyChange(e.target.value)}
+          onBlur={() => {
+            const v = parseFloat(qtyStr);
+            if (isNaN(v) || v <= 0) { setQtyStr(String(value)); setAmtStr((value * price).toFixed(2)); }
+          }}
+          className="w-20 h-7 rounded-[6px] bg-[#242424] border border-white/[0.14] text-[#f0f0f0] text-sm font-bold font-mono text-center focus:border-[#00e5a0] focus:outline-none"
+        />
+        <span style={{ fontSize: 11, color: "#666", minWidth: 20 }}>{unit}</span>
+      </div>
+      <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+        <div style={{ position: "relative", width: 80 }}>
+          <span style={{ position: "absolute", left: 6, top: "50%", transform: "translateY(-50%)", fontSize: 11, color: "#555", pointerEvents: "none" }}>$</span>
+          <input
+            type="number"
+            inputMode="decimal"
+            min="0.01"
+            step="0.01"
+            value={amtStr}
+            onChange={(e) => handleAmtChange(e.target.value)}
+            onFocus={() => { editingAmt.current = true; setAmtStr(""); }}
+            onBlur={() => {
+              editingAmt.current = false;
+              setAmtStr((value * price).toFixed(2));
+            }}
+            style={{ paddingLeft: 14 }}
+            className="w-full h-7 rounded-[6px] bg-[#242424] border border-white/[0.14] text-[#f0f0f0] text-sm font-mono text-center focus:border-[#00e5a0] focus:outline-none"
+          />
+        </div>
+        <span style={{ fontSize: 11, color: "#444", minWidth: 20 }}>MXN</span>
+      </div>
     </div>
   );
 }
@@ -147,9 +199,9 @@ export default function Scanner() {
     const CACHE_KEY = "products_cache";
     const loadProducts = async () => {
       try {
-        const products = await productsApi.list();
-        allProductsRef.current = products;
-        localStorage.setItem(CACHE_KEY, JSON.stringify(products));
+        const data = await productsApi.list({ limit: 100 });
+        allProductsRef.current = data?.items ?? [];
+        localStorage.setItem(CACHE_KEY, JSON.stringify(data?.items ?? []));
       } catch {
         const cached = localStorage.getItem(CACHE_KEY);
         if (cached) {
@@ -600,6 +652,7 @@ export default function Scanner() {
               <BulkQtyInput
                 value={item.quantity}
                 unit={item.unit}
+                price={item.price}
                 onChange={(v) => changeQty(item.product_id, v)}
               />
             )}
@@ -837,12 +890,12 @@ export default function Scanner() {
           </div>
 
           {/* Cart list */}
-          <div className="flex-1 overflow-y-auto px-4 flex flex-col gap-2 pb-2">
+          <div className="flex-1 overflow-y-auto px-4 flex flex-col gap-2 pb-20">
             {cartItemsList}
           </div>
 
-          {/* Total */}
-          <div className="sticky bottom-16">
+          {/* Total — fixed above navbar */}
+          <div className="fixed left-0 right-0 z-20" style={{ bottom: "calc(64px + env(safe-area-inset-bottom))" }}>
             {totalBar}
           </div>
         </>

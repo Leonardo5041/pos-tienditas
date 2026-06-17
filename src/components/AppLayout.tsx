@@ -1,13 +1,24 @@
-import { Outlet } from "react-router-dom";
+import { Outlet, useNavigate, useLocation } from "react-router-dom";
 import { useBreakpoint } from "@/hooks/useBreakpoint";
 import Sidebar from "@/components/Sidebar";
 import { TrialBanner } from "@/components/TrialBanner";
 import { useAuthStore } from "@/stores/authStore";
+import { useEffect } from "react";
 
 export default function AppLayout() {
   const bp = useBreakpoint();
   const { store } = useAuthStore();
-  const showTrial = store?.is_on_trial === true && store?.plan === 'free';
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  const trialExpired = !store?.is_on_trial && store?.effective_plan === "free";
+  const showTrial = (store?.is_on_trial === true && store?.plan === 'free') || trialExpired;
+
+  useEffect(() => {
+    if (trialExpired && location.pathname !== "/subscription") {
+      navigate("/subscription", { replace: true });
+    }
+  }, [trialExpired, location.pathname, navigate]);
 
   if (bp === "mobile") {
     return (

@@ -3,6 +3,7 @@ import { useSearchParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Search, Camera, Plus, Pencil, AlertTriangle, MoreVertical, Trash2 } from "lucide-react";
 import { productsApi } from "@/lib/products";
+import type { ProductsPage } from "@/lib/products";
 import { catalogApi } from "@/lib/catalog";
 import { pendingProductsDb } from "@/lib/db";
 import type { Product } from "@/types/product";
@@ -56,6 +57,7 @@ export default function Inventory() {
   const [scannedBarcode, setScannedBarcode] = useState<string | null>(null);
   const [catalogData, setCatalogData] = useState<CatalogProduct | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [page, setPage] = useState(1);
   const [toast, setToast] = useState<string | null>(null);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [showOptionsSheet, setShowOptionsSheet] = useState(false);
@@ -99,11 +101,15 @@ export default function Inventory() {
     }
   }, [isOffline, searchQuery, cacheVersion]);
 
-  const { data: fetchedProducts = [], isLoading } = useQuery({
-    queryKey: ["products", searchQuery],
-    queryFn: () => productsApi.list(searchQuery ? { search: searchQuery } : undefined),
+  const { data: fetchedData, isLoading } = useQuery<ProductsPage>({
+    queryKey: ["products", searchQuery, page],
+    queryFn: () => productsApi.list({ ...(searchQuery ? { search: searchQuery } : {}), page }),
     enabled: !isOffline,
   });
+  const fetchedProducts = fetchedData?.items ?? [];
+  const total = fetchedData?.total ?? 0;
+  const totalPages = Math.ceil(total / (fetchedData?.limit ?? 20));
+  const lowStockTotal = fetchedData?.low_stock_total ?? 0;
 
   const { data: pendingProducts = [], refetch: refetchPending } = useQuery({
     queryKey: ["products", "pending"],
@@ -112,14 +118,16 @@ export default function Inventory() {
   });
 
   useEffect(() => {
-    if (!searchQuery && fetchedProducts.length > 0) {
+    if (!searchQuery && page === 1 && fetchedProducts.length > 0) {
       localStorage.setItem(CACHE_KEY, JSON.stringify(fetchedProducts));
     }
-  }, [fetchedProducts, searchQuery]);
+  }, [fetchedProducts, searchQuery, page]);
 
   const products = isOffline ? cachedProducts : fetchedProducts;
 
-  const lowStockCount = products.filter((p) => p.stock <= p.low_stock_threshold).length;
+  const lowStockCount = isOffline
+    ? products.filter((p) => p.stock <= p.low_stock_threshold).length
+    : lowStockTotal;
 
   const showToast = (msg: string) => {
     setToast(msg);
@@ -312,7 +320,7 @@ export default function Inventory() {
             type="search"
             placeholder="Buscar producto o código..."
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            onChange={(e) => { setSearchQuery(e.target.value.toUpperCase()); setPage(1); }}
             className="w-full h-11 pl-10 pr-4 rounded-[10px] bg-[#1a1a1a] border border-white/[0.08] text-[#f0f0f0] placeholder:text-[#666] focus:border-[#00e5a0] focus:outline-none focus:ring-1 focus:ring-[#00e5a0]/30"
           />
         </div>
@@ -391,6 +399,34 @@ export default function Inventory() {
           ))
         )}
       </div>
+
+      {!isOffline && totalPages > 1 && (
+        <div className="px-4 pt-3 pb-1 flex items-center gap-3">
+          <button
+            disabled={page === 1}
+            onClick={() => setPage((p) => p - 1)}
+            className="flex-1 h-10 rounded-[10px] bg-[#1a1a1a] border border-white/[0.08] text-sm font-medium text-[#f0f0f0] disabled:opacity-30 disabled:cursor-not-allowed"
+          >
+            ← Anterior
+          </button>
+          <span className="text-xs text-[#555] flex-shrink-0 text-center whitespace-nowrap">
+            {page} / {totalPages}
+          </span>
+          <button
+            disabled={page >= totalPages}
+            onClick={() => setPage((p) => p + 1)}
+            className="flex-1 h-10 rounded-[10px] bg-[#1a1a1a] border border-white/[0.08] text-sm font-medium text-[#f0f0f0] disabled:opacity-30 disabled:cursor-not-allowed"
+          >
+            Siguiente →
+          </button>
+        </div>
+      )}
+
+      {!isOffline && total > 0 && (
+        <p className="px-4 pt-2 pb-1 text-xs text-[#444] text-center">
+          {total} producto{total !== 1 ? "s" : ""} en total
+        </p>
+      )}
 
       <Modal
         isOpen={showOptionsSheet && !!selectedProduct}

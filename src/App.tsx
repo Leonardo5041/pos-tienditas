@@ -19,6 +19,7 @@ import Settings from "@/pages/Settings";
 import Subscription from "@/pages/Subscription";
 import SubscriptionSuccess from "@/pages/SubscriptionSuccess";
 import SubscriptionCancel from "@/pages/SubscriptionCancel";
+import Receipts from "@/pages/Receipts";
 
 function RootRedirect() {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
@@ -46,6 +47,7 @@ export default function App() {
             <Route path="/reports" element={<Reports />} />
             <Route path="/payment" element={<Payment />} />
             <Route path="/receipt" element={<Receipt />} />
+            <Route path="/receipts" element={<Receipts />} />
             <Route path="/settings" element={<Settings />} />
             <Route path="/subscription" element={<Subscription />} />
           </Route>

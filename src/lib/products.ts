@@ -1,8 +1,16 @@
 import { apiFetch } from "./api";
 import type { Product, CreateProductInput } from "../types/product";
 
+export type ProductsPage = {
+  items: Product[];
+  total: number;
+  page: number;
+  limit: number;
+  low_stock_total: number;
+};
+
 export const productsApi = {
-  list: (params?: { search?: string; low_stock?: boolean }) => {
+  list: (params?: { search?: string; low_stock?: boolean; page?: number; limit?: number }) => {
     const qs = params
       ? new URLSearchParams(
           Object.fromEntries(
@@ -12,7 +20,7 @@ export const productsApi = {
           )
         ).toString()
       : "";
-    return apiFetch<Product[]>(`/api/v1/products${qs ? "?" + qs : ""}`);
+    return apiFetch<ProductsPage>(`/api/v1/products${qs ? "?" + qs : ""}`);
   },
 
   getByBarcode: (code: string) =>

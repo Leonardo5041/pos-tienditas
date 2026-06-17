@@ -1,22 +1,31 @@
 import { NavLink } from "react-router-dom";
-import { Home, ShoppingCart, Package, BookOpen, BarChart2, Wallet, DollarSign } from "lucide-react";
+import { Home, ShoppingCart, Package, BookOpen, BarChart2, Wallet, DollarSign, FileText } from "lucide-react";
 import { useIsMobile } from "@/hooks/useBreakpoint";
 import { useAuthStore } from "@/stores/authStore";
 
 export default function Navbar() {
   const isMobile = useIsMobile();
-  const { user } = useAuthStore();
+  const { user, store } = useAuthStore();
   const role = user?.role;
 
   if (!isMobile) return null;
+
+  const planLevel: Record<string, number> = { basico: 1, recomendado: 2, oro: 3 };
+  const plan = planLevel[store?.effective_plan ?? ""] ?? 0;
+  const isPro = plan >= 2;
 
   const tabs = [
     { to: "/dashboard", label: "Inicio",    Icon: Home         },
     { to: "/scanner",   label: "Vender",    Icon: ShoppingCart },
     { to: "/inventory", label: "Stock",     Icon: Package      },
+    ...((role === "owner" || role === "inventory") && isPro
+      ? [{ to: "/receipts", label: "Tickets", Icon: FileText }]
+      : []),
     { to: "/credit",    label: "Fiado",     Icon: BookOpen     },
-    { to: "/expenses",  label: "Gastos",    Icon: Wallet       },
-    ...(role === "owner" || role === "cashier"
+    ...(isPro
+      ? [{ to: "/expenses", label: "Gastos", Icon: Wallet }]
+      : []),
+    ...((role === "owner" || role === "cashier") && isPro
       ? [{ to: "/registers", label: "Caja", Icon: DollarSign }]
       : []),
     { to: "/reports",   label: "Reportes",  Icon: BarChart2    },
