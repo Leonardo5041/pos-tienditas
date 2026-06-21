@@ -1,7 +1,8 @@
 import { useLocation, useNavigate, Navigate } from "react-router-dom";
 import { useAuthStore } from "@/stores/authStore";
 import type { Sale } from "@/types/sale";
-import { useBluetoothPrinter } from "../hooks/useBluetoothPrinter";
+import { useBLEPrinter } from "../hooks/useBLEPrinter";
+import { buildESCPOS } from "@/lib/escpos";
 
 
 type ReceiptState = { sale: Sale; offline: boolean } | null;
@@ -18,7 +19,7 @@ export default function Receipt() {
   const user = useAuthStore((s) => s.user);
   const store = useAuthStore((s) => s.store);
 
-  const { isSupported, isConnected, error: printError, connect, print } = useBluetoothPrinter();
+  const { print, printing, error: printError, isSupported } = useBLEPrinter();
 
   const state = location.state as ReceiptState;
   if (!state?.sale) return <Navigate to="/dashboard" replace />;
@@ -26,18 +27,23 @@ export default function Receipt() {
   const { sale, offline } = state;
 
   const handlePrint = async () => {
-    if (!isConnected) await connect();
-    const lines = [
-      store?.name ?? "Mi Tienda",
-      new Date(sale.created_at).toLocaleString("es-MX"),
-      "--------------------------------",
-      ...sale.items.map(
-        (i) => `${i.product_name} x${i.quantity}  $${(i.subtotal ?? i.unit_price * i.quantity).toFixed(2)}`
-      ),
-      "--------------------------------",
-      `TOTAL: $${sale.total.toFixed(2)}`,
-    ];
-    await print(lines);
+    const data = buildESCPOS({
+      storeName: store?.name ?? "Mi Tienda",
+      cashierName: user?.name ?? "",
+      sale: {
+        id: sale.id,
+        total: sale.total,
+        payment_method: sale.payment_method,
+        created_at: sale.created_at,
+        items: sale.items.map((i) => ({
+          product_name: i.product_name,
+          quantity: i.quantity,
+          unit_price: i.unit_price,
+          subtotal: i.subtotal,
+        })),
+      },
+    });
+    await print(data);
   };
   const _saleDate = new Date(sale.created_at);
   const time = _saleDate.toLocaleString("es-MX", { timeZone: "America/Mexico_City", hour: "2-digit", minute: "2-digit", hour12: true });
@@ -166,10 +172,11 @@ export default function Receipt() {
             <>
               <button
                 onClick={handlePrint}
+                disabled={printing}
                 className="w-full h-11 rounded-[12px] font-medium"
-                style={{ background: "#242424", border: "1px solid rgba(255,255,255,0.1)", color: "#999" }}
+                style={{ background: "#242424", border: "1px solid rgba(255,255,255,0.1)", color: "#999", opacity: printing ? 0.6 : 1 }}
               >
-                🖨️ {isConnected ? "Imprimir ticket" : "Imprimir ticket"}
+                🖨️ {printing ? "Imprimiendo..." : "Imprimir ticket"}
               </button>
               {printError && (
                 <p className="text-xs text-center" style={{ color: "#ff6b6b" }}>{printError}</p>
