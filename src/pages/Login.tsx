@@ -157,7 +157,12 @@ export default function Login() {
           </button>
         </form>
 
-        <p className="mt-5 text-center text-sm text-[#666]">
+        <p className="mt-4 text-center text-sm text-[#666]">
+          <Link to="/forgot-password" className="text-[#666] hover:text-[#999] transition-colors">
+            ¿Olvidaste tu contraseña?
+          </Link>
+        </p>
+        <p className="mt-3 text-center text-sm text-[#666]">
           ¿Tienda nueva?{" "}
           <Link to="/register" className="text-[#00e5a0] font-medium cursor-pointer">
             Regístrate aquí

@@ -1,6 +1,7 @@
 import { useLocation, useNavigate, Navigate } from "react-router-dom";
 import { useAuthStore } from "@/stores/authStore";
 import type { Sale } from "@/types/sale";
+import { useBluetoothPrinter } from "../hooks/useBluetoothPrinter";
 
 
 type ReceiptState = { sale: Sale; offline: boolean } | null;
@@ -17,10 +18,27 @@ export default function Receipt() {
   const user = useAuthStore((s) => s.user);
   const store = useAuthStore((s) => s.store);
 
+  const { isSupported, isConnected, error: printError, connect, print } = useBluetoothPrinter();
+
   const state = location.state as ReceiptState;
   if (!state?.sale) return <Navigate to="/dashboard" replace />;
 
   const { sale, offline } = state;
+
+  const handlePrint = async () => {
+    if (!isConnected) await connect();
+    const lines = [
+      store?.name ?? "Mi Tienda",
+      new Date(sale.created_at).toLocaleString("es-MX"),
+      "--------------------------------",
+      ...sale.items.map(
+        (i) => `${i.product_name} x${i.quantity}  $${(i.subtotal ?? i.unit_price * i.quantity).toFixed(2)}`
+      ),
+      "--------------------------------",
+      `TOTAL: $${sale.total.toFixed(2)}`,
+    ];
+    await print(lines);
+  };
   const _saleDate = new Date(sale.created_at);
   const time = _saleDate.toLocaleString("es-MX", { timeZone: "America/Mexico_City", hour: "2-digit", minute: "2-digit", hour12: true });
   const dateStr = _saleDate.toLocaleString("es-MX", { timeZone: "America/Mexico_City", day: "2-digit", month: "short", year: "numeric" });
@@ -144,6 +162,20 @@ export default function Receipt() {
           >
             + Nueva venta
           </button>
+          {isSupported && (
+            <>
+              <button
+                onClick={handlePrint}
+                className="w-full h-11 rounded-[12px] font-medium"
+                style={{ background: "#242424", border: "1px solid rgba(255,255,255,0.1)", color: "#999" }}
+              >
+                🖨️ {isConnected ? "Imprimir ticket" : "Imprimir ticket"}
+              </button>
+              {printError && (
+                <p className="text-xs text-center" style={{ color: "#ff6b6b" }}>{printError}</p>
+              )}
+            </>
+          )}
           <button
             onClick={() => navigate("/dashboard")}
             className="w-full h-11 rounded-[12px] text-[#666] font-medium"

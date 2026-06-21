@@ -5,12 +5,13 @@ import type { DailyReport } from "@/types/report";
 import Navbar from "@/components/Navbar";
 import { useAuthStore } from "@/stores/authStore";
 
-type Tab = "daily" | "weekly" | "monthly";
+type Tab = "daily" | "weekly" | "monthly" | "range";
 
 const TABS: { key: Tab; label: string }[] = [
   { key: "daily",   label: "Hoy" },
   { key: "weekly",  label: "Esta semana" },
   { key: "monthly", label: "Este mes" },
+  { key: "range",   label: "Seleccionar fechas" },
 ];
 
 const METHOD_CFG: Record<string, { label: string; color: string }> = {
@@ -26,7 +27,7 @@ function pctDiff(a: number, b: number) {
   return Math.round(((a - b) / b) * 100);
 }
 
-function getPeriodComparison(tab: Tab, report: DailyReport & Record<string, number>) {
+function getPeriodComparison(tab: Exclude<Tab, "range">, report: DailyReport & Record<string, number>) {
   if (tab === "daily") {
     return { prev: report.yesterday_total ?? 0, prevCount: report.yesterday_count ?? 0, label: "ayer" };
   }
@@ -81,33 +82,48 @@ function CashierDailyView() {
 export default function Reports() {
   const { user } = useAuthStore();
   const [tab, setTab] = useState<Tab>("daily");
+  const today = new Date().toISOString().slice(0, 10);
+  const [rangeStart, setRangeStart] = useState(today);
+  const [rangeEnd, setRangeEnd] = useState(today);
+  const [appliedStart, setAppliedStart] = useState(today);
+  const [appliedEnd, setAppliedEnd] = useState(today);
 
   if (user?.role === "cashier") {
     return <CashierDailyView />;
   }
 
-  const queryFn = tab === "daily" ? reportsApi.daily : tab === "weekly" ? reportsApi.weekly : reportsApi.monthly;
+  const queryFn =
+    tab === "daily"   ? reportsApi.daily :
+    tab === "weekly"  ? reportsApi.weekly :
+    tab === "monthly" ? reportsApi.monthly :
+    () => reportsApi.range(appliedStart, appliedEnd);
+
   const { data: report, isLoading } = useQuery({
-    queryKey: ["reports", tab],
+    queryKey: tab === "range" ? ["reports", "range", appliedStart, appliedEnd] : ["reports", tab],
     queryFn,
+    enabled: tab !== "range" || (!!appliedStart && !!appliedEnd),
   });
 
   const r = report as (DailyReport & Record<string, number>) | undefined;
-  const comparison = r ? getPeriodComparison(tab, r) : null;
+  const comparison = (r && tab !== "range") ? getPeriodComparison(tab, r) : null;
   const pct = comparison ? pctDiff(r!.total_sales, comparison.prev) : null;
 
-  const ingresosLabel = tab === "daily" ? "INGRESOS HOY" : tab === "weekly" ? "INGRESOS ESTA SEMANA" : "INGRESOS ESTE MES";
+  const ingresosLabel =
+    tab === "daily"   ? "INGRESOS HOY" :
+    tab === "weekly"  ? "INGRESOS ESTA SEMANA" :
+    tab === "monthly" ? "INGRESOS ESTE MES" :
+    `INGRESOS ${appliedStart} — ${appliedEnd}`;
 
   return (
     <div className="min-h-screen bg-[#0f0f0f] pb-24">
       <div className="px-4 pt-5 pb-3">
         <h1 className="text-2xl font-bold text-[#f0f0f0] mb-4">Reportes</h1>
-        <div className="flex gap-2">
+        <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
           {TABS.map((t) => (
             <button
               key={t.key}
               onClick={() => setTab(t.key)}
-              className="px-4 py-1.5 rounded-full text-sm font-medium transition-all"
+              className="px-4 py-1.5 rounded-full text-sm font-medium transition-all flex-shrink-0"
               style={{
                 background: tab === t.key ? "rgba(0,229,160,0.12)" : "transparent",
                 border: tab === t.key ? "1px solid rgba(0,229,160,0.35)" : "1px solid rgba(255,255,255,0.1)",
@@ -118,6 +134,41 @@ export default function Reports() {
             </button>
           ))}
         </div>
+
+        {tab === "range" && (
+          <div className="mt-3 flex gap-2 items-end">
+            <div className="flex-1">
+              <p className="text-[10px] text-[#555] uppercase tracking-wider mb-1">Desde</p>
+              <input
+                type="date"
+                value={rangeStart}
+                max={rangeEnd}
+                onChange={(e) => setRangeStart(e.target.value)}
+                className="w-full rounded-[10px] px-3 py-2 text-sm text-[#f0f0f0] outline-none"
+                style={{ background: "#1a1a1a", border: "1px solid rgba(255,255,255,0.1)" }}
+              />
+            </div>
+            <div className="flex-1">
+              <p className="text-[10px] text-[#555] uppercase tracking-wider mb-1">Hasta</p>
+              <input
+                type="date"
+                value={rangeEnd}
+                min={rangeStart}
+                max={today}
+                onChange={(e) => setRangeEnd(e.target.value)}
+                className="w-full rounded-[10px] px-3 py-2 text-sm text-[#f0f0f0] outline-none"
+                style={{ background: "#1a1a1a", border: "1px solid rgba(255,255,255,0.1)" }}
+              />
+            </div>
+            <button
+              onClick={() => { setAppliedStart(rangeStart); setAppliedEnd(rangeEnd); }}
+              className="px-4 py-2 rounded-[10px] text-sm font-semibold flex-shrink-0"
+              style={{ background: "rgba(0,229,160,0.15)", border: "1px solid rgba(0,229,160,0.35)", color: "#00e5a0" }}
+            >
+              Ver
+            </button>
+          </div>
+        )}
       </div>
 
       <div className="px-4 flex flex-col gap-3 pb-4">
@@ -208,7 +259,7 @@ export default function Reports() {
             {r.top_products.length > 0 && (
               <div className="bg-[#1a1a1a] border border-white/[0.08] rounded-[14px] px-4 py-4">
                 <p className="text-xs font-semibold text-[#666] uppercase tracking-wider mb-4">
-                  Top productos {tab === "daily" ? "del día" : tab === "weekly" ? "de la semana" : "del mes"}
+                  Top productos {tab === "daily" ? "del día" : tab === "weekly" ? "de la semana" : tab === "monthly" ? "del mes" : "del período"}
                 </p>
                 {r.top_products.map((p, i) => {
                   const maxUnits = r.top_products[0].units_sold;
