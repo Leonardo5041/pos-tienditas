@@ -170,7 +170,7 @@ export default function Dashboard() {
                     style={{ background: "rgba(0,229,160,0.15)", filter: "blur(16px)" }}
                   />
                   <p className="text-[10px] font-bold uppercase tracking-widest mb-1" style={{ color: "rgba(0,229,160,0.55)" }}>
-                    💰 Ganancia
+                    💰 Ganancia neta
                   </p>
                   {profitData ? (
                     <>
@@ -180,11 +180,6 @@ export default function Dashboard() {
                       >
                         ${profitData.profit.toLocaleString("es-MX", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
                       </p>
-                      {profitData.total_sales > 0 && profitData.profit > 0 && (
-                        <p className="text-xs mt-1 font-bold" style={{ color: "#00e5a0" }}>
-                          {Math.round((profitData.profit / profitData.total_sales) * 100)}% margen
-                        </p>
-                      )}
                     </>
                   ) : (
                     <p className="text-2xl font-black font-mono text-[#2a2a2a] leading-tight">$—</p>

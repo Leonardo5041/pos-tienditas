@@ -4,6 +4,7 @@ import { reportsApi } from "@/lib/reports";
 import type { DailyReport } from "@/types/report";
 import Navbar from "@/components/Navbar";
 import { useAuthStore } from "@/stores/authStore";
+import { apiFetch } from "@/lib/api";
 
 type Tab = "daily" | "weekly" | "monthly" | "range";
 
@@ -104,6 +105,14 @@ export default function Reports() {
     enabled: tab !== "range" || (!!appliedStart && !!appliedEnd),
   });
 
+  const insightPeriod = tab === "range" ? null : tab;
+  const { data: insightData, isLoading: insightLoading } = useQuery({
+    queryKey: ["reports", "insights", insightPeriod],
+    queryFn: () => apiFetch<{ insight: string }>(`/api/v1/reports/insights?period=${insightPeriod}`),
+    enabled: !!insightPeriod,
+    staleTime: 60 * 60 * 1000,
+  });
+
   const r = report as (DailyReport & Record<string, number>) | undefined;
   const comparison = (r && tab !== "range") ? getPeriodComparison(tab, r) : null;
   const pct = comparison ? pctDiff(r!.total_sales, comparison.prev) : null;
@@ -182,7 +191,7 @@ export default function Reports() {
 
         {r && (
           <>
-            {/* Ingresos + Ganancia */}
+            {/* Ingresos */}
             <div className="grid grid-cols-2 gap-3">
               {/* Ingresos */}
               <div
@@ -202,7 +211,58 @@ export default function Reports() {
                 )}
               </div>
 
-              {/* Ganancia */}
+              {/* IA insight */}
+              {insightPeriod && (
+                <div
+                  className="rounded-[16px] px-4 py-4"
+                  style={{ background: "rgba(116,185,255,0.06)", border: "1px solid rgba(116,185,255,0.2)" }}
+                >
+                  <p className="text-[10px] font-semibold uppercase tracking-wider mb-2" style={{ color: "#74b9ff" }}>
+                    ✨ Análisis de tu negocio
+                  </p>
+                  {insightLoading ? (
+                    <div className="flex flex-col gap-1.5">
+                      {[80, 65, 75].map((w, i) => (
+                        <div key={i} className="h-2 rounded-full animate-pulse" style={{ width: `${w}%`, background: "rgba(116,185,255,0.2)" }} />
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="flex flex-col gap-1.5">
+                      {(insightData?.insight ?? "").split("\n").filter(Boolean).map((line, i) => (
+                        <p key={i} className="text-[11px] leading-snug" style={{ color: "#cce4ff" }}>
+                          • {line}
+                        </p>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Ganancia bruta + Ganancia neta */}
+            <div className="grid grid-cols-2 gap-3">
+              {/* Ganancia bruta */}
+              <div
+                className="rounded-[16px] px-4 py-4"
+                style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)" }}
+              >
+                <p className="text-[10px] font-semibold text-[#555] uppercase tracking-widest mb-1">Ganancia bruta</p>
+                {r.gross_profit > 0 ? (
+                  <>
+                    <p className="text-2xl font-bold text-[#f0f0f0] font-mono leading-tight">
+                      ${r.gross_profit.toLocaleString("es-MX", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                    </p>
+                    <p className="text-[10px] text-[#555] mt-1.5">precio − costo</p>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-2xl font-bold font-mono text-[#2a2a2a] leading-tight">$0</p>
+                    <p className="text-[10px] text-[#333] mt-1.5">Agrega costos</p>
+                  </>
+                )}
+              </div>
+
+              {/* Ganancia neta */}
               <div
                 className="rounded-[16px] px-4 py-4 relative overflow-hidden"
                 style={{
@@ -216,7 +276,7 @@ export default function Reports() {
                   style={{ background: "rgba(0,229,160,0.15)", filter: "blur(16px)" }}
                 />
                 <p className="text-[10px] font-bold uppercase tracking-widest mb-1" style={{ color: "rgba(0,229,160,0.55)" }}>
-                  💰 Ganancia
+                  💰 Ganancia neta
                 </p>
                 {r.gross_profit > 0 ? (
                   <>
@@ -224,18 +284,18 @@ export default function Reports() {
                       className="text-2xl font-black font-mono leading-tight"
                       style={{ color: "#00e5a0", textShadow: "0 0 16px rgba(0,229,160,0.45)" }}
                     >
-                      ${r.gross_profit.toLocaleString("es-MX", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                      ${(r.net_profit ?? r.gross_profit).toLocaleString("es-MX", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
                     </p>
-                    {r.total_sales > 0 && (
-                      <p className="text-xs mt-1.5 font-bold" style={{ color: "#00e5a0" }}>
-                        {Math.round((r.gross_profit / r.total_sales) * 100)}% margen
+                    {(r.total_expenses ?? 0) > 0 && (
+                      <p className="text-[10px] mt-1" style={{ color: "rgba(0,229,160,0.45)" }}>
+                        −${(r.total_expenses as number).toLocaleString("es-MX", { minimumFractionDigits: 0 })} gastos
                       </p>
                     )}
                   </>
                 ) : (
                   <>
                     <p className="text-2xl font-black font-mono text-[#2a2a2a] leading-tight">$0</p>
-                    <p className="text-[10px] text-[#333] mt-1.5">Agrega costos a tus productos</p>
+                    <p className="text-[10px] text-[#333] mt-1.5">Agrega costos</p>
                   </>
                 )}
               </div>
@@ -348,6 +408,7 @@ export default function Reports() {
             )}
           </>
         )}
+
       </div>
 
       <Navbar />
