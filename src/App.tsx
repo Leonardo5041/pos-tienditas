@@ -1,8 +1,10 @@
+import { useEffect } from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { useAuthStore } from "@/stores/authStore";
 import PrivateRoute from "@/components/PrivateRoute";
 import AppLayout from "@/components/AppLayout";
 import OfflineBanner from "@/components/OfflineBanner";
+import { prefetchAllProducts } from "@/lib/productCache";
 import Login from "@/pages/Login";
 import Register from "@/pages/Register";
 import Dashboard from "@/pages/Dashboard";
@@ -27,9 +29,24 @@ function RootRedirect() {
   return <Navigate to={isAuthenticated ? "/dashboard" : "/login"} replace />;
 }
 
+function ProductPrefetcher() {
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    if (navigator.onLine) void prefetchAllProducts();
+    const handleOnline = () => void prefetchAllProducts();
+    window.addEventListener("online", handleOnline);
+    return () => window.removeEventListener("online", handleOnline);
+  }, [isAuthenticated]);
+
+  return null;
+}
+
 export default function App() {
   return (
     <BrowserRouter>
+      <ProductPrefetcher />
       <OfflineBanner />
       <Routes>
         <Route path="/" element={<RootRedirect />} />

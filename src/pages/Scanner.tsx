@@ -5,6 +5,7 @@ import {
   Zap, ZapOff, Search, X, Plus, Monitor,
 } from "lucide-react";
 import { productsApi } from "@/lib/products";
+import { readProductsCache, prefetchAllProducts } from "@/lib/productCache";
 import { catalogApi } from "@/lib/catalog";
 import { useCartStore } from "@/stores/cartStore";
 import { useScanner } from "@/hooks/useScanner";
@@ -194,22 +195,21 @@ export default function Scanner() {
     prevItemCount.current = itemCount;
   }, [itemCount]);
 
-  // Load all products on mount; persist to localStorage for offline use
+  // Load products from cache then refresh if online
   useEffect(() => {
-    const CACHE_KEY = "products_cache";
-    const loadProducts = async () => {
-      try {
-        const data = await productsApi.list({ limit: 100 });
-        allProductsRef.current = data?.items ?? [];
-        localStorage.setItem(CACHE_KEY, JSON.stringify(data?.items ?? []));
-      } catch {
-        const cached = localStorage.getItem(CACHE_KEY);
-        if (cached) {
-          try { allProductsRef.current = JSON.parse(cached); } catch { /* ignore */ }
-        }
-      }
+    allProductsRef.current = readProductsCache();
+    if (navigator.onLine) {
+      prefetchAllProducts().then(() => {
+        allProductsRef.current = readProductsCache();
+      });
+    }
+    const handleOnline = () => {
+      prefetchAllProducts().then(() => {
+        allProductsRef.current = readProductsCache();
+      });
     };
-    loadProducts();
+    window.addEventListener("online", handleOnline);
+    return () => window.removeEventListener("online", handleOnline);
   }, []);
 
   // Client-side search (instant, works offline)

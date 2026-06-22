@@ -24,6 +24,15 @@ function stockState(p: Product): StockState {
   return "ok";
 }
 
+const BULK_UNITS = new Set(["kg", "g", "lt", "l", "ml", "lb", "oz"]);
+
+function formatStock(stock: number, unit?: string): string {
+  if (unit && BULK_UNITS.has(unit.toLowerCase())) {
+    return parseFloat(stock.toFixed(3)).toString();
+  }
+  return Math.round(stock).toString();
+}
+
 function StockBadge({ p }: { p: Product }) {
   const state = stockState(p);
   if (state === "out") {
@@ -36,13 +45,13 @@ function StockBadge({ p }: { p: Product }) {
   if (state === "low") {
     return (
       <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-[#ff9f43]/[0.12] text-[#ff9f43]">
-        ⚠ {p.stock} uds
+        ⚠ {formatStock(p.stock, p.unit)} {p.unit ?? "uds"}
       </span>
     );
   }
   return (
     <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-[#00e5a0]/[0.12] text-[#00e5a0]">
-      ✓ {p.stock} uds
+      ✓ {formatStock(p.stock, p.unit)} {p.unit ?? "uds"}
     </span>
   );
 }

@@ -64,7 +64,7 @@ export default function Subscription() {
       {/* Header */}
       <div className="px-4 pt-4 pb-3 flex items-start gap-3">
         <button
-          onClick={() => navigate('/settings')}
+          onClick={() => navigate(-1)}
           className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5"
           style={{ background: '#1a1a1a', border: '1px solid rgba(255,255,255,0.08)' }}
         >
