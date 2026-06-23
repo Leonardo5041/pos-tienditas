@@ -108,9 +108,9 @@ export default function Reports() {
   const insightPeriod = tab === "range" ? null : tab;
   const { data: insightData, isLoading: insightLoading } = useQuery({
     queryKey: ["reports", "insights", insightPeriod],
-    queryFn: () => apiFetch<{ insight: string }>(`/api/v1/reports/insights?period=${insightPeriod}`),
+    queryFn: () => apiFetch<{ insight: string | null; available_after?: string }>(`/api/v1/reports/insights?period=${insightPeriod}`),
     enabled: !!insightPeriod,
-    staleTime: 60 * 60 * 1000,
+    staleTime: 5 * 60 * 1000,
   });
 
   const r = report as (DailyReport & Record<string, number>) | undefined;
@@ -226,6 +226,10 @@ export default function Reports() {
                         <div key={i} className="h-2 rounded-full animate-pulse" style={{ width: `${w}%`, background: "rgba(116,185,255,0.2)" }} />
                       ))}
                     </div>
+                  ) : insightData?.insight === null ? (
+                    <p className="text-[11px] leading-snug" style={{ color: "rgba(116,185,255,0.45)" }}>
+                      Disponible después de las 6 pm
+                    </p>
                   ) : (
                     <div className="flex flex-col gap-1.5">
                       {(insightData?.insight ?? "").split("\n").filter(Boolean).map((line, i) => (
