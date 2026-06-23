@@ -6,7 +6,31 @@ import Navbar from "@/components/Navbar";
 import { useAuthStore } from "@/stores/authStore";
 import { apiFetch } from "@/lib/api";
 
-type Tab = "daily" | "weekly" | "monthly" | "range";
+type Tab = "daily" | "weekly" | "monthly" | "range"
+
+function getLocalInsight(period: string): string | null {
+  try {
+    const raw = localStorage.getItem(`insight_cache_${period}`)
+    if (!raw) return null
+    const { text, expiresAt } = JSON.parse(raw)
+    if (Date.now() > expiresAt) return null
+    return text as string
+  } catch { return null }
+}
+
+function setLocalInsight(period: string, text: string) {
+  const now = new Date()
+  let expiresAt: number
+  if (period === "daily") {
+    expiresAt = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1).getTime()
+  } else if (period === "weekly") {
+    const daysUntilSunday = (7 - now.getDay()) || 7
+    expiresAt = new Date(now.getFullYear(), now.getMonth(), now.getDate() + daysUntilSunday).getTime()
+  } else {
+    expiresAt = Date.now() + 24 * 60 * 60 * 1000
+  }
+  localStorage.setItem(`insight_cache_${period}`, JSON.stringify({ text, expiresAt }))
+};
 
 const TABS: { key: Tab; label: string }[] = [
   { key: "daily",   label: "Hoy" },
@@ -106,11 +130,17 @@ export default function Reports() {
   });
 
   const insightPeriod = tab === "range" ? null : tab;
+  const localInsight = insightPeriod ? getLocalInsight(insightPeriod) : null;
   const { data: insightData, isLoading: insightLoading } = useQuery({
     queryKey: ["reports", "insights", insightPeriod],
-    queryFn: () => apiFetch<{ insight: string | null; available_after?: string }>(`/api/v1/reports/insights?period=${insightPeriod}`),
-    enabled: !!insightPeriod,
-    staleTime: 5 * 60 * 1000,
+    queryFn: async () => {
+      const result = await apiFetch<{ insight: string | null; available_after?: string }>(`/api/v1/reports/insights?period=${insightPeriod}`)
+      if (result.insight) setLocalInsight(insightPeriod!, result.insight)
+      return result
+    },
+    enabled: !!insightPeriod && !localInsight,
+    initialData: localInsight ? { insight: localInsight } : undefined,
+    staleTime: Infinity,
   });
 
   const r = report as (DailyReport & Record<string, number>) | undefined;
@@ -228,7 +258,7 @@ export default function Reports() {
                     </div>
                   ) : insightData?.insight === null ? (
                     <p className="text-[11px] leading-snug" style={{ color: "rgba(116,185,255,0.45)" }}>
-                      Disponible después de las 6 pm
+                      Disponible {insightData.available_after ?? "próximamente"}
                     </p>
                   ) : (
                     <div className="flex flex-col gap-1.5">
