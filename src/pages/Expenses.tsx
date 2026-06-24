@@ -24,7 +24,15 @@ function monthRange() {
   return { from, to };
 }
 
-const emptyForm = { category: "" as ExpenseCategory | "", description: "", amount: "" };
+const PAYMENT_METHODS = [
+  { value: "cash",     label: "💵 Efectivo" },
+  { value: "card",     label: "💳 Tarjeta" },
+  { value: "transfer", label: "📱 Transferencia" },
+] as const;
+
+type PaymentMethod = "cash" | "card" | "transfer";
+
+const emptyForm = { category: "" as ExpenseCategory | "", description: "", amount: "", payment_method: "cash" as PaymentMethod };
 
 export default function Expenses() {
   const { user } = useAuthStore();
@@ -55,6 +63,7 @@ export default function Expenses() {
         category: form.category as ExpenseCategory,
         description: form.description || undefined,
         amount: parseFloat(form.amount),
+        payment_method: form.payment_method,
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["expenses"] });
@@ -257,6 +266,33 @@ export default function Expenses() {
               className="w-full bg-[#242424] border border-white/[0.08] rounded-[10px] px-4 h-14 text-[#f0f0f0] placeholder:text-[#555] focus:border-[#00e5a0] focus:outline-none"
               style={{ fontSize: "28px", fontFamily: "DM Mono, monospace" }}
             />
+          </div>
+
+          {/* Payment method */}
+          <div>
+            <p className="text-xs text-[#666] uppercase tracking-wider mb-2">¿Cómo se pagó?</p>
+            <div className="grid grid-cols-3 gap-2">
+              {PAYMENT_METHODS.map(({ value, label }) => (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => setForm((f) => ({ ...f, payment_method: value }))}
+                  className="py-2.5 rounded-[10px] text-sm font-semibold transition-colors"
+                  style={{
+                    background: form.payment_method === value ? "rgba(0,229,160,0.12)" : "#242424",
+                    border:     form.payment_method === value ? "1.5px solid rgba(0,229,160,0.5)" : "1px solid rgba(255,255,255,0.08)",
+                    color:      form.payment_method === value ? "#00e5a0" : "#888",
+                  }}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            <p className="text-xs mt-1.5" style={{ color: form.payment_method === "cash" ? "#ff9f43" : "#666" }}>
+              {form.payment_method === "cash"
+                ? "Este gasto restará del corte de caja"
+                : "No afecta el corte de caja"}
+            </p>
           </div>
 
           {/* Actions */}

@@ -24,7 +24,7 @@ function stockState(p: Product): StockState {
   return "ok";
 }
 
-const BULK_UNITS = new Set(["kg", "g", "lt", "l", "ml", "lb", "oz"]);
+const BULK_UNITS = new Set(["kg"]);
 
 function formatStock(stock: number, unit?: string): string {
   if (unit && BULK_UNITS.has(unit.toLowerCase())) {
@@ -71,6 +71,7 @@ export default function Inventory() {
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [showOptionsSheet, setShowOptionsSheet] = useState(false);
   const [showPendingModal, setShowPendingModal] = useState(false);
+  const [showLowStock, setShowLowStock] = useState(false);
 
   const { user } = useAuthStore();
   const isOwner = user?.role === "owner";
@@ -133,6 +134,12 @@ export default function Inventory() {
   }, [fetchedProducts, searchQuery, page]);
 
   const products = isOffline ? cachedProducts : fetchedProducts;
+
+  const displayProducts = showLowStock
+    ? [...products]
+        .filter((p) => p.stock <= p.low_stock_threshold)
+        .sort((a, b) => a.stock - b.stock)
+    : products;
 
   const lowStockCount = isOffline
     ? products.filter((p) => p.stock <= p.low_stock_threshold).length
@@ -329,18 +336,37 @@ export default function Inventory() {
             type="search"
             placeholder="Buscar producto o código..."
             value={searchQuery}
-            onChange={(e) => { setSearchQuery(e.target.value.toUpperCase()); setPage(1); }}
+            onChange={(e) => { setSearchQuery(e.target.value.toUpperCase()); setPage(1); setShowLowStock(false); }}
             className="w-full h-11 pl-10 pr-4 rounded-[10px] bg-[#1a1a1a] border border-white/[0.08] text-[#f0f0f0] placeholder:text-[#666] focus:border-[#00e5a0] focus:outline-none focus:ring-1 focus:ring-[#00e5a0]/30"
           />
         </div>
       </header>
 
-      {lowStockCount > 0 && (
-        <div className="mx-4 mt-3 flex items-center gap-2 px-3 py-2.5 rounded-[10px] bg-[#ff9f43]/[0.12] border border-[#ff9f43]/25">
+      {lowStockCount > 0 && !showLowStock && (
+        <button
+          onClick={() => setShowLowStock(true)}
+          className="mx-4 mt-3 w-[calc(100%-2rem)] flex items-center gap-2 px-3 py-2.5 rounded-[10px] bg-[#ff9f43]/[0.12] border border-[#ff9f43]/25 text-left"
+        >
           <AlertTriangle size={16} className="text-[#ff9f43] flex-shrink-0" />
           <span className="text-sm font-medium text-[#ff9f43]">
             {lowStockCount} producto{lowStockCount === 1 ? "" : "s"} con stock bajo
           </span>
+          <span className="ml-auto text-xs text-[#ff9f43]/60">Ver →</span>
+        </button>
+      )}
+
+      {showLowStock && (
+        <div className="mx-4 mt-3 flex items-center gap-2 px-3 py-2.5 rounded-[10px] bg-[#ff6b6b]/[0.12] border border-[#ff6b6b]/30">
+          <AlertTriangle size={16} className="text-[#ff6b6b] flex-shrink-0" />
+          <span className="text-sm font-medium text-[#ff6b6b]">
+            Mostrando {displayProducts.length} producto{displayProducts.length === 1 ? "" : "s"} con stock bajo
+          </span>
+          <button
+            onClick={() => setShowLowStock(false)}
+            className="ml-auto text-xs text-[#ff6b6b] font-semibold px-2 py-0.5 rounded bg-[#ff6b6b]/[0.15] hover:bg-[#ff6b6b]/25"
+          >
+            ✕ Ver todos
+          </button>
         </div>
       )}
 
@@ -358,7 +384,7 @@ export default function Inventory() {
             <p className="text-[#444] text-sm mt-1">Toca + para agregar el primero</p>
           </div>
         ) : (
-          products.map((product) => (
+          displayProducts.map((product) => (
             <div
               key={product.id}
               className="bg-[#1a1a1a] border border-white/[0.08] rounded-[10px] px-4 py-3 flex items-center gap-3 active:bg-[#242424] transition-colors"

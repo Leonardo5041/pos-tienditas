@@ -287,11 +287,9 @@ export default function Scanner() {
     }
   };
 
-  const role = user?.role ?? "";
-
   const handleAddUnknown = async () => {
     const price = parseFloat(unknownPrice);
-    if (role !== "cashier" && !unknownName.trim()) {
+    if (!unknownName.trim()) {
       setUnknownError("El nombre es requerido");
       return;
     }
@@ -302,7 +300,7 @@ export default function Scanner() {
     setIsCreating(true);
     setUnknownError("");
     try {
-      const name = role === "cashier" ? "PRODUCTO " + unknownBarcode : unknownName.trim().toUpperCase();
+      const name = unknownName.trim().toUpperCase();
       const result = await productsApi.createExpress({
         barcode: unknownBarcode ?? "",
         name,
@@ -912,8 +910,7 @@ export default function Scanner() {
         <p className="text-xs font-mono mb-4" style={{ color: "#444" }}>{unknownBarcode}</p>
 
         <div className="flex flex-col gap-3 mb-4">
-          {role !== "cashier" && (
-            <div>
+          <div>
               <label className="block text-xs font-semibold text-[#666] uppercase tracking-wider mb-2">
                 Nombre
               </label>
@@ -927,7 +924,6 @@ export default function Scanner() {
                 className="w-full h-11 bg-[#242424] border border-white/[0.14] rounded-[10px] px-4 text-[#f0f0f0] text-sm font-semibold uppercase focus:outline-none focus:border-[#00e5a0]"
               />
             </div>
-          )}
 
           <div>
             <label className="block text-xs font-semibold text-[#666] uppercase tracking-wider mb-2">
@@ -941,7 +937,7 @@ export default function Scanner() {
                 min={0}
                 step="0.01"
                 placeholder="0.00"
-                autoFocus={role === "cashier"}
+                autoFocus={false}
                 value={unknownPrice}
                 onChange={(e) => setUnknownPrice(e.target.value)}
                 onKeyDown={(e) => { if (e.key === "Enter") handleAddUnknown(); }}

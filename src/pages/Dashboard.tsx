@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { BarChart, Bar, XAxis, YAxis, Cell, ResponsiveContainer, Tooltip } from "recharts";
@@ -6,6 +7,8 @@ import { reportsApi } from "@/lib/reports";
 import { salesApi } from "@/lib/sales";
 import { expensesApi } from "@/lib/expenses";
 import { registersApi } from "@/lib/registers";
+import type { Sale } from "@/types/sale";
+import Modal from "@/components/Modal";
 import Navbar from "@/components/Navbar";
 
 const roleLabel: Record<string, string> = {
@@ -57,6 +60,19 @@ export default function Dashboard() {
   });
 
   const recentSales = recentData?.sales ?? [];
+
+  const [selectedSale, setSelectedSale] = useState<Sale | null>(null);
+  const [saleLoading, setSaleLoading] = useState(false);
+
+  const handleSaleClick = async (id: string) => {
+    setSaleLoading(true);
+    try {
+      const sale = await salesApi.get(id);
+      setSelectedSale(sale);
+    } finally {
+      setSaleLoading(false);
+    }
+  };
 
   const salesPct   = report ? pctDiff(report.total_sales, report.yesterday_total ?? 0) : null;
   const countDiff  = report ? report.transaction_count - (report.yesterday_count ?? 0) : null;
@@ -180,6 +196,11 @@ export default function Dashboard() {
                       >
                         ${profitData.profit.toLocaleString("es-MX", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
                       </p>
+                      {profitData.profit < 0 && (report.products_without_cost ?? 0) > 0 && (
+                        <p className="text-xs mt-1" style={{ color: "#666" }}>
+                          ⚠️ {report.products_without_cost} producto{report.products_without_cost !== 1 ? "s" : ""} sin costo registrado pueden afectar este cálculo
+                        </p>
+                      )}
                     </>
                   ) : (
                     <p className="text-2xl font-black font-mono text-[#2a2a2a] leading-tight">$—</p>
@@ -292,9 +313,10 @@ export default function Dashboard() {
               {recentSales.map((sale, i) => {
                 const cfg = paymentConfig[sale.payment_method] ?? { label: sale.payment_method, color: "#666" };
                 return (
-                  <div
+                  <button
                     key={sale.id}
-                    className="px-4 py-3 flex items-center gap-3"
+                    onClick={() => handleSaleClick(sale.id)}
+                    className="w-full px-4 py-3 flex items-center gap-3 text-left transition-colors hover:bg-white/[0.03] active:bg-white/[0.05]"
                     style={i < recentSales.length - 1 ? { borderBottom: "1px solid rgba(255,255,255,0.06)" } : {}}
                   >
                     <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: cfg.color }} />
@@ -309,7 +331,7 @@ export default function Dashboard() {
                     <span className="text-sm font-bold text-[#00e5a0] font-mono">
                       ${sale.total.toFixed(2)}
                     </span>
-                  </div>
+                  </button>
                 );
               })}
             </div>
@@ -349,6 +371,58 @@ export default function Dashboard() {
           🛒 Iniciar nueva venta
         </button>
       </div>
+
+      <Modal
+        isOpen={!!selectedSale || saleLoading}
+        onClose={() => setSelectedSale(null)}
+        maxWidth={420}
+      >
+        {saleLoading && (
+          <div className="py-10 text-center text-sm text-[#666]">Cargando...</div>
+        )}
+        {selectedSale && !saleLoading && (() => {
+          const cfg = paymentConfig[selectedSale.payment_method] ?? { label: selectedSale.payment_method, color: "#666" };
+          return (
+            <>
+              <div className="mb-4">
+                <p className="text-xs text-[#555] font-mono">#{selectedSale.id.slice(0, 8).toUpperCase()}</p>
+                <p className="text-2xl font-bold text-[#f0f0f0] font-mono mt-0.5">
+                  ${selectedSale.total.toFixed(2)}
+                </p>
+                <span
+                  className="inline-block mt-1 text-xs font-semibold px-2 py-0.5 rounded-full"
+                  style={{ background: cfg.color + "22", color: cfg.color }}
+                >
+                  {cfg.label}
+                </span>
+              </div>
+
+              <div className="flex flex-col gap-1">
+                {selectedSale.items.map((item, i) => (
+                  <div
+                    key={i}
+                    className="flex items-center justify-between px-3 py-2.5 rounded-[10px] bg-[#1a1a1a]"
+                  >
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-[#f0f0f0] truncate">{item.product_name}</p>
+                      <p className="text-xs text-[#555] font-mono mt-0.5">
+                        {item.quantity} × ${item.unit_price.toFixed(2)}
+                      </p>
+                    </div>
+                    <span className="text-sm font-bold text-[#00e5a0] font-mono ml-3">
+                      ${(item.quantity * item.unit_price).toFixed(2)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+
+              <p className="text-xs text-[#444] text-center mt-3">
+                {new Date(selectedSale.created_at).toLocaleString("es-MX", { timeZone: "America/Mexico_City" })}
+              </p>
+            </>
+          );
+        })()}
+      </Modal>
 
       <Navbar />
     </div>

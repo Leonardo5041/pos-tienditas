@@ -27,6 +27,9 @@ export type DailyReport = {
   transaction_count: number;
   avg_ticket: number;
   gross_profit: number;
+  net_profit: number;
+  total_expenses: number;
+  products_without_cost: number;
   yesterday_total: number;
   yesterday_count: number;
   sales_by_hour: HourSale[];

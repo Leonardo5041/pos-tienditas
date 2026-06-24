@@ -39,7 +39,8 @@ export default function ProductForm({ product, initialBarcode, catalogData, onSa
   const [cost, setCost] = useState(product?.cost?.toString() ?? "");
   const [stock, setStock] = useState(product?.stock?.toString() ?? "0");
   const [threshold, setThreshold] = useState(
-    product?.low_stock_threshold?.toString() ?? "5"
+    product?.low_stock_threshold?.toString() ??
+    ((product?.unit ?? "pza") === "kg" ? "0.100" : "2")
   );
   const [unit, setUnit] = useState(product?.unit ?? "pza");
   const [loading, setLoading] = useState(false);
@@ -75,7 +76,7 @@ export default function ProductForm({ product, initialBarcode, catalogData, onSa
       name: name.trim(),
       price: parseFloat(price),
       cost: cost ? parseFloat(cost) : undefined,
-      stock: parseInt(stock) || 0,
+      stock: unit === "pza" ? (parseInt(stock) || 0) : (parseFloat(stock) || 0),
       low_stock_threshold: parseFloat(threshold) || 5,
       unit,
     };
@@ -239,10 +240,16 @@ export default function ProductForm({ product, initialBarcode, catalogData, onSa
             <input
               type="number"
               min="0"
+              step={unit === "pza" ? "1" : "0.001"}
               className={inputCls + " font-mono"}
               value={stock}
-              onChange={(e) => setStock(e.target.value)}
-              placeholder="0"
+              onChange={(e) => {
+                const val = unit === "pza"
+                  ? e.target.value.replace(/[^0-9]/g, "")
+                  : e.target.value;
+                setStock(val);
+              }}
+              placeholder={unit === "pza" ? "0" : "0.000"}
             />
           </div>
           <div>
@@ -261,12 +268,20 @@ export default function ProductForm({ product, initialBarcode, catalogData, onSa
 
         <div>
           <label className={labelCls}>Tipo de venta</label>
-          <div className="grid grid-cols-3 gap-2">
-            {(["pza", "kg", "g"] as const).map((u) => (
+          <div className="grid grid-cols-2 gap-2">
+            {(["pza", "kg"] as const).map((u) => (
               <button
                 key={u}
                 type="button"
-                onClick={() => setUnit(u)}
+                onClick={() => {
+                  setUnit(u);
+                  if (u === "pza") {
+                    setStock(String(Math.floor(parseFloat(stock) || 0)));
+                    if (!product) setThreshold("2");
+                  } else {
+                    if (!product) setThreshold("0.100");
+                  }
+                }}
                 className={`h-11 rounded-[10px] text-sm font-semibold border transition-colors ${
                   unit === u
                     ? "bg-[#00e5a0]/[0.15] border-[#00e5a0]/50 text-[#00e5a0]"

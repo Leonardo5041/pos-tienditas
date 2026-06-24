@@ -6,6 +6,11 @@ export type SaleItem = {
   subtotal?: number;
 };
 
+export type SaleWarning = {
+  product_name: string;
+  message: string;
+};
+
 export type Sale = {
   id: string;
   total: number;
@@ -13,6 +18,7 @@ export type Sale = {
   items: SaleItem[];
   created_at: string;
   offline?: boolean;
+  warnings?: SaleWarning[];
 };
 
 export type CreateSaleInput = {

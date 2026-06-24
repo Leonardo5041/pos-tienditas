@@ -151,6 +151,23 @@ export default function Receipt() {
           </div>
         </div>
 
+        {/* Stock warnings */}
+        {sale.warnings && sale.warnings.length > 0 && (
+          <div
+            className="w-full rounded-[10px] px-4 py-3"
+            style={{
+              background: "rgba(255,159,67,0.08)",
+              border: "1px solid rgba(255,159,67,0.2)",
+            }}
+          >
+            {sale.warnings.map((w, i) => (
+              <p key={i} className="text-xs" style={{ color: "#ff9f43" }}>
+                ⚠️ {w.product_name}: {w.message}
+              </p>
+            ))}
+          </div>
+        )}
+
         {/* Meta info */}
         <div className="text-center text-xs text-[#444]" style={{ lineHeight: 1.8 }}>
           {store?.name && <div>{store.name}</div>}

@@ -27,7 +27,9 @@ export default function Payment() {
   const [error, setError] = useState<string | null>(null);
 
   const receivedNum = parseFloat(received) || 0;
-  const change = method === "cash" && receivedNum >= total ? receivedNum - total : null;
+  const change = method === "cash" && receivedNum >= total
+    ? Math.round((receivedNum - total) * 100) / 100
+    : null;
 
   const handleConfirm = async () => {
     setError(null);
@@ -179,7 +181,7 @@ export default function Payment() {
             {/* Quick denomination buttons */}
             <div className="grid grid-cols-5 gap-2">
               {(["exacto", 50, 100, 200, 500] as const).map((d) => {
-                const val = d === "exacto" ? total : d;
+                const val = d === "exacto" ? parseFloat(total.toFixed(2)) : d;
                 const isActive = parseFloat(received) === val;
                 const covers = val >= total;
                 return (

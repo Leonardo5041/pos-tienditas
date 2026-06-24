@@ -1,7 +1,9 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { ChevronRight } from "lucide-react";
 import { reportsApi } from "@/lib/reports";
 import type { DailyReport } from "@/types/report";
+import Modal from "@/components/Modal";
 import Navbar from "@/components/Navbar";
 import { useAuthStore } from "@/stores/authStore";
 import { apiFetch } from "@/lib/api";
@@ -112,6 +114,7 @@ export default function Reports() {
   const [rangeEnd, setRangeEnd] = useState(today);
   const [appliedStart, setAppliedStart] = useState(today);
   const [appliedEnd, setAppliedEnd] = useState(today);
+  const [showProfitModal, setShowProfitModal] = useState(false);
 
   if (user?.role === "cashier") {
     return <CashierDailyView />;
@@ -297,12 +300,14 @@ export default function Reports() {
               </div>
 
               {/* Ganancia neta */}
-              <div
-                className="rounded-[16px] px-4 py-4 relative overflow-hidden"
+              <button
+                onClick={() => setShowProfitModal(true)}
+                className="rounded-[16px] px-4 py-4 relative overflow-hidden text-left w-full"
                 style={{
                   background: "linear-gradient(135deg, rgba(0,229,160,0.13) 0%, rgba(0,229,160,0.05) 100%)",
                   border: "1.5px solid rgba(0,229,160,0.35)",
                   boxShadow: "0 0 24px rgba(0,229,160,0.08)",
+                  cursor: "pointer",
                 }}
               >
                 <div
@@ -332,7 +337,11 @@ export default function Reports() {
                     <p className="text-[10px] text-[#333] mt-1.5">Agrega costos</p>
                   </>
                 )}
-              </div>
+                <div className="flex items-center gap-1 mt-2">
+                  <span className="text-xs" style={{ color: "#555" }}>Ver detalle</span>
+                  <ChevronRight size={12} color="#555" />
+                </div>
+              </button>
             </div>
 
             {/* Ventas + Ticket */}
@@ -444,6 +453,104 @@ export default function Reports() {
         )}
 
       </div>
+
+      {r && (
+        <Modal
+          isOpen={showProfitModal}
+          onClose={() => setShowProfitModal(false)}
+          title="💰 Desglose de ganancia"
+          maxWidth={420}
+        >
+          {(() => {
+            const netProfit   = r.net_profit ?? r.gross_profit;
+            const costOfGoods = r.total_sales - r.gross_profit;
+            const withoutCost = r.products_without_cost ?? 0;
+
+            return (
+              <div className="flex flex-col gap-3">
+                {/* INGRESOS */}
+                <div>
+                  <p className="text-[10px] text-[#555] uppercase tracking-wider mb-2">Ingresos</p>
+                  <div className="flex justify-between items-center px-4 py-3 rounded-[10px]" style={{ background: "#242424" }}>
+                    <span className="text-sm text-[#999]">Ventas del período</span>
+                    <span className="text-sm font-bold font-mono" style={{ color: "#00e5a0" }}>
+                      ${r.total_sales.toFixed(2)}
+                    </span>
+                  </div>
+                </div>
+
+                {/* COSTOS */}
+                <div>
+                  <p className="text-[10px] text-[#555] uppercase tracking-wider mb-2">Costo de mercancía</p>
+                  <div className="flex justify-between items-center px-4 py-3 rounded-[10px]" style={{ background: "#242424" }}>
+                    <span className="text-sm text-[#999]">Costo de productos vendidos</span>
+                    <span className="text-sm font-mono" style={{ color: "#ff6b6b" }}>
+                      -{costOfGoods.toFixed(2)}
+                    </span>
+                  </div>
+                  {withoutCost > 0 && (
+                    <p className="text-xs mt-1.5" style={{ color: "#ff9f43" }}>
+                      ⚠️ {withoutCost} producto{withoutCost !== 1 ? "s" : ""} sin costo registrado pueden afectar este cálculo
+                    </p>
+                  )}
+                </div>
+
+                {/* GANANCIA BRUTA */}
+                <div className="flex justify-between items-center px-4 py-3 rounded-[10px]" style={{ background: "#242424" }}>
+                  <span className="text-sm font-semibold" style={{ color: "#f0f0f0" }}>Ganancia bruta</span>
+                  <span
+                    className="text-sm font-bold font-mono"
+                    style={{ color: r.gross_profit >= 0 ? "#00e5a0" : "#ff6b6b" }}
+                  >
+                    ${r.gross_profit.toFixed(2)}
+                  </span>
+                </div>
+
+                {/* GASTOS */}
+                <div>
+                  <p className="text-[10px] text-[#555] uppercase tracking-wider mb-2">Gastos operativos</p>
+                  <div className="flex justify-between items-center px-4 py-3 rounded-[10px]" style={{ background: "#242424" }}>
+                    <span className="text-sm text-[#999]">Gastos operativos</span>
+                    <span className="text-sm font-mono" style={{ color: "#ff6b6b" }}>
+                      -{((r.total_expenses as number) ?? 0).toFixed(2)}
+                    </span>
+                  </div>
+                </div>
+
+                {/* GANANCIA NETA */}
+                <div
+                  className="flex justify-between items-center px-4 py-4 rounded-[12px]"
+                  style={{
+                    background: netProfit >= 0 ? "rgba(0,229,160,0.08)" : "rgba(255,107,107,0.08)",
+                    border:     netProfit >= 0 ? "1px solid rgba(0,229,160,0.2)" : "1px solid rgba(255,107,107,0.2)",
+                  }}
+                >
+                  <span className="text-xs font-bold uppercase tracking-wider" style={{ color: "#999" }}>
+                    Ganancia neta
+                  </span>
+                  <span
+                    className="text-2xl font-bold font-mono"
+                    style={{ color: netProfit >= 0 ? "#00e5a0" : "#ff6b6b" }}
+                  >
+                    ${netProfit.toFixed(2)}
+                  </span>
+                </div>
+
+                {netProfit < 0 && (
+                  <p className="text-xs text-center mt-1" style={{ color: "#555" }}>
+                    Los gastos superaron la ganancia de ventas de hoy
+                  </p>
+                )}
+                {withoutCost > 0 && (
+                  <p className="text-xs text-center" style={{ color: "#ff9f43" }}>
+                    Registra el costo de compra de tus productos para mayor precisión
+                  </p>
+                )}
+              </div>
+            );
+          })()}
+        </Modal>
+      )}
 
       <Navbar />
     </div>

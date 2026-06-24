@@ -46,7 +46,7 @@ export const useCartStore = create<CartState>((set, get) => ({
 
   clear: () => set({ items: [] }),
 
-  total: () => get().items.reduce((sum, i) => sum + i.price * i.quantity, 0),
+  total: () => Math.round(get().items.reduce((sum, i) => sum + i.price * i.quantity, 0) * 100) / 100,
 
   itemCount: () => get().items.reduce((sum, i) => sum + (!i.unit || i.unit === "pza" ? i.quantity : 1), 0),
 }));

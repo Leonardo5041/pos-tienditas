@@ -2,7 +2,7 @@ import { apiFetch } from "./api";
 import type { Expense, ExpenseCategory, ExpenseSummary } from "../types/expense";
 
 export const expensesApi = {
-  create: (data: { category: ExpenseCategory; description?: string; amount: number }) =>
+  create: (data: { category: ExpenseCategory; description?: string; amount: number; payment_method?: string }) =>
     apiFetch<Expense>("/api/v1/expenses", {
       method: "POST",
       body: JSON.stringify(data),
