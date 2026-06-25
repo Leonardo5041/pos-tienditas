@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { posDb } from "@/lib/db";
 
 interface User {
   id: string;
@@ -30,7 +31,7 @@ interface AuthState {
   store: Store | null;
   isAuthenticated: boolean;
   login: (data: LoginResponse) => void;
-  logout: () => void;
+  logout: () => Promise<void>;
   hydrate: () => void;
 }
 
@@ -47,7 +48,16 @@ export const useAuthStore = create<AuthState>((set) => ({
     set({ token: data.token, user: data.user, store: data.store, isAuthenticated: true });
   },
 
-  logout: () => {
+  logout: async () => {
+    const pending = await posDb.pendingSales.where("synced").equals(0).count();
+    if (pending > 0) {
+      const ok = window.confirm(
+        `Tienes ${pending} venta${pending > 1 ? "s" : ""} sin sincronizar.\n\nSi cierras sesión se perderán.\n¿Deseas continuar?`
+      );
+      if (!ok) return;
+    }
+    await posDb.pendingSales.clear();
+    await posDb.productsCache.clear();
     localStorage.removeItem("token");
     localStorage.removeItem("user");
     localStorage.removeItem("store");

@@ -6,7 +6,7 @@ import { useBreakpoint } from "@/hooks/useBreakpoint";
 
 export default function OfflineBanner() {
   const [isOnline, setIsOnline] = useState(navigator.onLine);
-  const { pendingCount: pendingSales, isSyncing: syncingSales, syncedMessage: salesMsg } = useOfflineSync();
+  const { pendingCount: pendingSales, failedCount, isSyncing: syncingSales, syncedMessage: salesMsg, retryAllFailed } = useOfflineSync();
   const { pendingCount: pendingProducts, isSyncing: syncingProducts, syncedMessage: productsMsg } = useProductSync();
   const bp = useBreakpoint();
   const leftOffset = bp === "desktop" ? 260 : bp === "tablet" ? 220 : 0;
@@ -26,7 +26,7 @@ export default function OfflineBanner() {
     };
   }, []);
 
-  if (isOnline && !isSyncing && !syncedMessage && totalPending === 0) return null;
+  if (isOnline && !isSyncing && !syncedMessage && totalPending === 0 && failedCount === 0) return null;
 
   const bannerStyle = { left: leftOffset };
 
@@ -55,6 +55,24 @@ export default function OfflineBanner() {
     return (
       <div className="fixed top-0 right-0 z-50 bg-green-600 text-white px-4 py-2 flex items-center gap-2 text-sm transition-all" style={bannerStyle}>
         <span>✓ {syncedMessage}</span>
+      </div>
+    );
+  }
+
+  if (failedCount > 0) {
+    return (
+      <div
+        className="fixed top-0 right-0 z-50 px-4 py-2 flex items-center gap-3 text-sm transition-all"
+        style={{ ...bannerStyle, background: "rgba(255,107,107,0.15)", borderBottom: "1px solid rgba(255,107,107,0.3)", color: "#ff6b6b" }}
+      >
+        <span>⚠️ {failedCount} venta{failedCount !== 1 ? "s" : ""} no {failedCount !== 1 ? "pudieron" : "pudo"} sincronizarse</span>
+        <button
+          onClick={() => void retryAllFailed()}
+          className="px-2 py-0.5 rounded text-xs font-semibold border"
+          style={{ borderColor: "#ff6b6b", color: "#ff6b6b" }}
+        >
+          Reintentar
+        </button>
       </div>
     );
   }

@@ -5,7 +5,7 @@ import {
   Zap, ZapOff, Search, X, Plus, Monitor,
 } from "lucide-react";
 import { productsApi } from "@/lib/products";
-import { readProductsCache, prefetchAllProducts } from "@/lib/productCache";
+import { readProductsCache, prefetchAllProducts, findByBarcode, searchByName } from "@/lib/productCache";
 import { catalogApi } from "@/lib/catalog";
 import { useCartStore } from "@/stores/cartStore";
 import { useScanner } from "@/hooks/useScanner";
@@ -141,6 +141,21 @@ export default function Scanner() {
   const handleBarcodeScan = async (rawCode: string) => {
     const code = normalizeBarcode(rawCode);
     setFeedback({ msg: "", kind: "loading" });
+
+    if (!navigator.onLine) {
+      const product = await findByBarcode(code);
+      if (product) {
+        addItem(product);
+        setLastAddedName(product.name);
+        setFeedback({ msg: `${product.name} agregado`, kind: "ok" });
+        setTimeout(() => setFeedback(null), 2000);
+      } else {
+        setFeedback({ msg: "Producto no encontrado", kind: "err" });
+        setTimeout(() => setFeedback(null), 2000);
+      }
+      return;
+    }
+
     try {
       const product = await productsApi.getByBarcode(code);
       addItem(product);
@@ -197,22 +212,28 @@ export default function Scanner() {
 
   // Load products from cache then refresh if online
   useEffect(() => {
-    allProductsRef.current = readProductsCache();
+    readProductsCache().then((products) => {
+      allProductsRef.current = products;
+    });
     if (navigator.onLine) {
       prefetchAllProducts().then(() => {
-        allProductsRef.current = readProductsCache();
+        readProductsCache().then((products) => {
+          allProductsRef.current = products;
+        });
       });
     }
     const handleOnline = () => {
       prefetchAllProducts().then(() => {
-        allProductsRef.current = readProductsCache();
+        readProductsCache().then((products) => {
+          allProductsRef.current = products;
+        });
       });
     };
     window.addEventListener("online", handleOnline);
     return () => window.removeEventListener("online", handleOnline);
   }, []);
 
-  // Client-side search (instant, works offline)
+  // Client-side search via IndexedDB cache (works offline)
   useEffect(() => {
     const q = searchQuery.trim();
     if (!q) {
@@ -220,14 +241,10 @@ export default function Scanner() {
       setShowResults(false);
       return;
     }
-    const lower = q.toLowerCase();
-    const results = allProductsRef.current.filter(
-      (p) =>
-        p.name.toLowerCase().includes(lower) ||
-        (p.barcode && p.barcode.toLowerCase().includes(lower))
-    );
-    setSearchResults(results);
-    setShowResults(true);
+    searchByName(q).then((results) => {
+      setSearchResults(results);
+      setShowResults(true);
+    });
   }, [searchQuery]);
 
   // Close dropdown on outside click

@@ -5,6 +5,8 @@ import { registersApi } from "@/lib/registers";
 import { usersApi } from "@/lib/users";
 import Modal from "@/components/Modal";
 import Navbar from "@/components/Navbar";
+import { useBLEPrinter } from "@/hooks/useBLEPrinter";
+import { buildRegisterTicket } from "@/lib/escpos";
 
 function fmtMXN(n: number) {
   return n.toLocaleString("es-MX", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -51,8 +53,10 @@ export default function CashRegister() {
   const [showCloseModal, setShowCloseModal] = useState(false);
   const [openForm,  setOpenForm]  = useState(emptyOpen);
   const [closeForm, setCloseForm] = useState(emptyClose);
-  const [closeStep,   setCloseStep]   = useState<CloseStep>("declare");
-  const [closeResult, setCloseResult] = useState<CloseResult | null>(null);
+  const [closeStep,    setCloseStep]    = useState<CloseStep>("declare");
+  const [closeResult,  setCloseResult]  = useState<CloseResult | null>(null);
+  const [closeContext, setCloseContext] = useState<{ cashierName: string; openedAt: string } | null>(null);
+  const { print, printing, error: printError, isSupported } = useBLEPrinter();
 
   const { data: current, isLoading } = useQuery<import("@/types/register").CashRegister | null>({
     queryKey: ["registers", "current"],
@@ -114,6 +118,7 @@ export default function CashRegister() {
     setCloseForm(emptyClose);
     setCloseStep("declare");
     setCloseResult(null);
+    setCloseContext(null);
   }
 
   const closedHistory = (history ?? []).filter((r) => r.status === "closed");
@@ -200,7 +205,10 @@ export default function CashRegister() {
             </p>
 
             <button
-              onClick={() => setShowCloseModal(true)}
+              onClick={() => {
+                setCloseContext({ cashierName: current.cashier_name, openedAt: current.opened_at });
+                setShowCloseModal(true);
+              }}
               className="mt-4 w-full h-12 rounded-[12px] font-bold"
               style={{
                 background: "rgba(255,107,107,0.15)",
@@ -508,6 +516,36 @@ export default function CashRegister() {
               </div>
             </div>
 
+            {isSupported && closeContext && (
+              <>
+                <button
+                  onClick={async () => {
+                    const store = useAuthStore.getState().store;
+                    const data = buildRegisterTicket({
+                      storeName: store?.name ?? "Mi Tienda",
+                      cashierName: closeContext.cashierName,
+                      openedAt: closeContext.openedAt,
+                      closedAt: new Date().toISOString(),
+                      result: closeResult,
+                    });
+                    await print(data);
+                  }}
+                  disabled={printing}
+                  className="w-full h-11 rounded-[12px] text-sm font-medium"
+                  style={{
+                    background: "#242424",
+                    border: "1px solid rgba(255,255,255,0.1)",
+                    color: "#999",
+                    opacity: printing ? 0.6 : 1,
+                  }}
+                >
+                  🖨️ {printing ? "Imprimiendo..." : "Imprimir corte"}
+                </button>
+                {printError && (
+                  <p className="text-xs text-center" style={{ color: "#ff6b6b" }}>{printError}</p>
+                )}
+              </>
+            )}
             <button
               onClick={resetCloseModal}
               className="w-full h-11 rounded-[12px] text-sm font-semibold"

@@ -1,3 +1,89 @@
+export type RegisterTicketParams = {
+  storeName: string;
+  cashierName: string;
+  openedAt: string;
+  closedAt: string;
+  result: {
+    initial_amount: number;
+    cash_sales: number;
+    turno_expenses: number;
+    expected_amount: number;
+    declared_amount: number;
+    difference: number;
+  };
+};
+
+export function buildRegisterTicket(p: RegisterTicketParams): Uint8Array {
+  const b: number[] = [];
+
+  b.push(ESC, 0x40);
+
+  b.push(ESC, 0x61, 0x01, ESC, 0x45, 0x01);
+  pushText(b, truncate(p.storeName, LINE_WIDTH));
+  b.push(LF, ESC, 0x45, 0x00);
+
+  b.push(ESC, 0x61, 0x01);
+  pushText(b, "CORTE DE CAJA");
+  b.push(LF);
+
+  b.push(ESC, 0x61, 0x00);
+  if (p.cashierName) {
+    pushText(b, `Cajero: ${p.cashierName}`);
+    b.push(LF);
+  }
+
+  const fmtDT = (s: string) => {
+    const d = new Date(s);
+    const opts = { timeZone: "America/Mexico_City" } as const;
+    const date = d.toLocaleDateString("es-MX", { ...opts, day: "2-digit", month: "2-digit", year: "numeric" });
+    const time = d.toLocaleTimeString("es-MX", { ...opts, hour: "2-digit", minute: "2-digit", hour12: false });
+    return `${date} ${time}`;
+  };
+
+  pushText(b, `Apertura: ${fmtDT(p.openedAt)}`);
+  b.push(LF);
+  pushText(b, `Cierre:   ${fmtDT(p.closedAt)}`);
+  b.push(LF);
+
+  pushText(b, separator());
+  b.push(LF);
+
+  const row = (label: string, val: string) => {
+    pushText(b, rowLR(label, val, LINE_WIDTH));
+    b.push(LF);
+  };
+
+  row("Fondo inicial", `$${p.result.initial_amount.toFixed(2)}`);
+  row("Ventas efectivo", `+$${p.result.cash_sales.toFixed(2)}`);
+  if (p.result.turno_expenses > 0) {
+    row("Gastos turno", `-$${p.result.turno_expenses.toFixed(2)}`);
+  }
+
+  pushText(b, separator());
+  b.push(LF);
+
+  row("Total esperado", `$${p.result.expected_amount.toFixed(2)}`);
+  row("Declarado", `$${p.result.declared_amount.toFixed(2)}`);
+
+  pushText(b, separator());
+  b.push(LF);
+
+  b.push(ESC, 0x45, 0x01);
+  const diffSign = p.result.difference >= 0 ? "+" : "";
+  row("Diferencia", `${diffSign}$${p.result.difference.toFixed(2)}`);
+  b.push(ESC, 0x45, 0x00);
+
+  b.push(ESC, 0x61, 0x01);
+  const resultLabel =
+    p.result.difference === 0 ? "CAJA CUADRADA" :
+    p.result.difference > 0   ? "SOBRANTE EN CAJA" :
+                                 "FALTANTE EN CAJA";
+  pushText(b, resultLabel);
+  b.push(LF, LF, LF, GS, 0x56, 0x42, 0x05);
+
+  return new Uint8Array(b);
+}
+
 const ESC = 0x1b;
 const GS = 0x1d;
 const LF = 0x0a;

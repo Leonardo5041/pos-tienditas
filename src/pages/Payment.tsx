@@ -3,8 +3,9 @@ import { useNavigate } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import { useCartStore } from "@/stores/cartStore";
 import { salesApi } from "@/lib/sales";
-import { pendingSalesDb } from "@/lib/db";
+import { pendingSalesDb, posDb } from "@/lib/db";
 import type { CreateSaleInput, PendingSale } from "@/types/sale";
+import { useOfflineSync } from "@/hooks/useOfflineSync";
 
 type PaymentMethod = "cash" | "card" | "transfer";
 
@@ -20,6 +21,8 @@ export default function Payment() {
   const total = useCartStore((s) => s.total());
   const itemCount = useCartStore((s) => s.itemCount());
   const clear = useCartStore((s) => s.clear);
+
+  const { refreshCount } = useOfflineSync();
 
   const [method, setMethod] = useState<PaymentMethod>("cash");
   const [received, setReceived] = useState("");
@@ -54,6 +57,15 @@ export default function Payment() {
           synced: false,
         };
         await pendingSalesDb.add(pendingSale);
+        for (const item of items) {
+          const cached = await posDb.productsCache.get(item.product_id);
+          if (cached) {
+            await posDb.productsCache.update(item.product_id, {
+              stock: Math.max(0, (cached.stock ?? 0) - item.quantity),
+            });
+          }
+        }
+        await refreshCount();
         const localSale = {
           id: pendingSale.id,
           total,

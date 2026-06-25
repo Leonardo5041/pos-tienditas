@@ -2,7 +2,7 @@ import { apiFetch } from "./api";
 import type { Product, CreateProductInput } from "../types/product";
 
 export type ProductsPage = {
-  items: Product[];
+  products: Product[];
   total: number;
   page: number;
   limit: number;

@@ -116,7 +116,7 @@ export default function Inventory() {
     queryFn: () => productsApi.list({ ...(searchQuery ? { search: searchQuery } : {}), page }),
     enabled: !isOffline,
   });
-  const fetchedProducts = fetchedData?.items ?? [];
+  const fetchedProducts = fetchedData?.products ?? [];
   const total = fetchedData?.total ?? 0;
   const totalPages = Math.ceil(total / (fetchedData?.limit ?? 20));
   const lowStockTotal = fetchedData?.low_stock_total ?? 0;

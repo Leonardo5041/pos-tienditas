@@ -10,6 +10,23 @@ import { apiFetch } from "@/lib/api";
 
 type Tab = "daily" | "weekly" | "monthly" | "range"
 
+function renderInsightLine(line: string, i: number) {
+  const isSubBullet = /^\s{2,}\*/.test(line);
+  const isBullet = !isSubBullet && /^\s*\*/.test(line);
+  const text = line.replace(/^\s*\*\s*/, "");
+  const parts = text.split(/\*\*(.+?)\*\*/g);
+  const rendered = parts.map((part, j) =>
+    j % 2 === 1
+      ? <strong key={j} style={{ color: "#ffffff", fontWeight: 600 }}>{part}</strong>
+      : part
+  );
+  return (
+    <p key={i} className="text-[11px] leading-snug" style={{ color: "#cce4ff", paddingLeft: isSubBullet ? "12px" : "0" }}>
+      {(isBullet || isSubBullet) ? "• " : ""}{rendered}
+    </p>
+  );
+}
+
 function getLocalInsight(period: string): string | null {
   try {
     const raw = localStorage.getItem(`insight_cache_${period}`)
@@ -265,11 +282,9 @@ export default function Reports() {
                     </p>
                   ) : (
                     <div className="flex flex-col gap-1.5">
-                      {(insightData?.insight ?? "").split("\n").filter(Boolean).map((line, i) => (
-                        <p key={i} className="text-[11px] leading-snug" style={{ color: "#cce4ff" }}>
-                          • {line}
-                        </p>
-                      ))}
+                      {(insightData?.insight ?? "").split("\n").filter(Boolean).map((line, i) =>
+                        renderInsightLine(line, i)
+                      )}
                     </div>
                   )}
                 </div>

@@ -8,12 +8,13 @@ export const salesApi = {
       body: JSON.stringify(data),
     }),
 
-  sync: (sales: Array<Pick<PendingSale, "items" | "payment_method" | "created_at">>) =>
+  sync: (sales: Array<Pick<PendingSale, "id" | "items" | "payment_method" | "created_at">>, signal?: AbortSignal) =>
     apiFetch<{ synced: number; errors: { index: number; error: string }[] }>(
       "/api/v1/sales/sync",
       {
         method: "POST",
         body: JSON.stringify({ sales }),
+        signal,
       }
     ),
 

@@ -335,7 +335,7 @@ export default function Receipts() {
 
       try {
         const data = await productsApi.list({ search: query });
-        updateItem(idx, { searchResults: data?.items ?? [] });
+        updateItem(idx, { searchResults: data?.products ?? [] });
       } catch { /* ignore */ }
       try {
         if (isNumeric) {

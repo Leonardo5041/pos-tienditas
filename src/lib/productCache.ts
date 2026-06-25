@@ -1,39 +1,56 @@
 import { productsApi } from "./products";
+import { posDb } from "./db";
 import type { Product } from "@/types/product";
 
-export const PRODUCTS_CACHE_KEY = "products_cache";
-
-export function readProductsCache(): Product[] {
-  try {
-    const raw = localStorage.getItem(PRODUCTS_CACHE_KEY);
-    return raw ? JSON.parse(raw) : [];
-  } catch {
-    return [];
-  }
-}
-
-export function writeProductsCache(products: Product[]) {
-  localStorage.setItem(PRODUCTS_CACHE_KEY, JSON.stringify(products));
-}
+let isFetching = false;
 
 export async function prefetchAllProducts(): Promise<void> {
+  if (isFetching) return;
+  isFetching = true;
+
   try {
-    const PAGE_SIZE = 100;
+    const all: Product[] = [];
     let page = 1;
-    let all: Product[] = [];
+    const PAGE_SIZE = 100;
 
     while (true) {
-      const data = await productsApi.list({ limit: PAGE_SIZE, page });
-      const items = data?.items ?? [];
-      all = all.concat(items);
-      if (all.length >= (data?.total ?? 0) || items.length < PAGE_SIZE) break;
+      const res = await productsApi.list({ page, limit: PAGE_SIZE });
+      const items = res.products ?? [];
+      const total = res.total ?? items.length;
+
+      all.push(...items);
+
+      if (all.length >= total || items.length < PAGE_SIZE) break;
       page++;
     }
 
     if (all.length > 0) {
-      writeProductsCache(all);
+      await writeProductsCache(all);
     }
   } catch {
-    // offline — keep existing cache
+    // offline — mantener cache anterior
+  } finally {
+    isFetching = false;
   }
+}
+
+export async function writeProductsCache(products: Product[]): Promise<void> {
+  await posDb.productsCache.clear();
+  await posDb.productsCache.bulkPut(products);
+}
+
+export async function readProductsCache(): Promise<Product[]> {
+  return await posDb.productsCache.toArray();
+}
+
+export async function findByBarcode(barcode: string): Promise<Product | undefined> {
+  return await posDb.productsCache.where("barcode").equals(barcode).first();
+}
+
+export async function searchByName(query: string): Promise<Product[]> {
+  const q = query.toUpperCase();
+  return await posDb.productsCache
+    .filter((p) => p.name.includes(q) || (p.barcode ?? "").includes(q))
+    .limit(10)
+    .toArray();
 }

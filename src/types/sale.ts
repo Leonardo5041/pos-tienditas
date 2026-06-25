@@ -30,6 +30,8 @@ export type PendingSale = CreateSaleInput & {
   id: string;
   created_at: string;
   synced: boolean;
+  retries?: number;
+  failed?: boolean;
 };
 
 export type ReceiptData = {
