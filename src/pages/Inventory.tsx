@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useSearchParams, useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Search, Camera, Plus, Pencil, AlertTriangle, MoreVertical, Trash2 } from "lucide-react";
 import { productsApi } from "@/lib/products";
@@ -57,6 +57,7 @@ function StockBadge({ p }: { p: Product }) {
 }
 
 export default function Inventory() {
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
   const autoHandledRef = useRef<string | null>(null);
@@ -309,6 +310,13 @@ export default function Inventory() {
           <h1 className="text-2xl font-bold text-[#f0f0f0]">Inventario</h1>
           <div className="flex items-center gap-2">
             <button
+              onClick={() => navigate("/barcodes")}
+              aria-label="Etiquetas"
+              className="w-10 h-10 rounded-[10px] bg-[#1a1a1a] border border-white/[0.08] flex items-center justify-center text-lg"
+            >
+              🏷️
+            </button>
+            <button
               onClick={() => setShowScanner(true)}
               aria-label="Escanear"
               className="w-10 h-10 rounded-[10px] bg-[#1a1a1a] border border-white/[0.08] text-white flex items-center justify-center"
@@ -503,6 +511,53 @@ export default function Inventory() {
               <div style={{ fontSize: "12px", color: "#666", marginTop: "2px" }}>Cambiar precio, stock o nombre</div>
             </div>
           </div>
+
+          {!selectedProduct?.barcode && canEdit && (
+            <div
+              onClick={async () => {
+                setShowOptionsSheet(false);
+                try {
+                  await productsApi.generateBarcode(selectedProduct!.id);
+                  queryClient.invalidateQueries({ queryKey: ["products"] });
+                } catch (err: unknown) {
+                  alert("Error: " + (err instanceof Error ? err.message : String(err)));
+                }
+              }}
+              style={{
+                display: "flex", alignItems: "center", gap: "16px",
+                padding: "16px", borderRadius: "12px",
+                background: "#242424", border: "1px solid rgba(255,255,255,0.06)",
+                cursor: "pointer",
+              }}
+            >
+              <span style={{ fontSize: "20px" }}>🏷️</span>
+              <div>
+                <div style={{ fontSize: "14px", fontWeight: 600, color: "#f0f0f0" }}>Generar código de barras</div>
+                <div style={{ fontSize: "12px", color: "#666", marginTop: "2px" }}>Asignar EAN-13 interno</div>
+              </div>
+            </div>
+          )}
+
+          {selectedProduct?.barcode && (
+            <div
+              onClick={() => {
+                setShowOptionsSheet(false);
+                navigate("/barcodes", { state: { preselected: selectedProduct!.id } });
+              }}
+              style={{
+                display: "flex", alignItems: "center", gap: "16px",
+                padding: "16px", borderRadius: "12px",
+                background: "#242424", border: "1px solid rgba(255,255,255,0.06)",
+                cursor: "pointer",
+              }}
+            >
+              <span style={{ fontSize: "20px" }}>🖨️</span>
+              <div>
+                <div style={{ fontSize: "14px", fontWeight: 600, color: "#f0f0f0" }}>Imprimir etiqueta</div>
+                <div style={{ fontSize: "12px", color: "#666", marginTop: "2px" }}>Vista previa y copias</div>
+              </div>
+            </div>
+          )}
 
           {isOwner && (
             <div

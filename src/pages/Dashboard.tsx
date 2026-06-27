@@ -300,7 +300,7 @@ export default function Dashboard() {
         <div>
           <div className="flex justify-between items-center mb-2">
             <p className="text-xs font-semibold text-[#666] uppercase tracking-wider">Últimas ventas</p>
-            <button onClick={() => navigate("/reports")} className="text-xs font-semibold text-[#00e5a0]">
+            <button onClick={() => navigate("/sales")} className="text-xs font-semibold text-[#00e5a0]">
               Ver historial
             </button>
           </div>

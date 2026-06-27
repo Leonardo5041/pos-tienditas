@@ -1,6 +1,7 @@
 export type Product = {
   id: string;
   barcode: string | null;
+  barcode_generated?: boolean;
   name: string;
   price: number;
   cost: number | null;

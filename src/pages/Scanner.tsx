@@ -23,6 +23,8 @@ function BulkQtyInput({ value, unit, price, onChange }: { value: number; unit: s
   const [qtyStr, setQtyStr] = useState(String(value));
   const [amtStr, setAmtStr] = useState((value * price).toFixed(2));
   const editingAmt = useRef(false);
+  const bp = useBreakpoint();
+  const large = bp !== "mobile";
 
   useEffect(() => {
     setQtyStr(String(value));
@@ -68,13 +70,13 @@ function BulkQtyInput({ value, unit, price, onChange }: { value: number; unit: s
             const v = parseFloat(qtyStr);
             if (isNaN(v) || v <= 0) { setQtyStr(String(value)); setAmtStr((value * price).toFixed(2)); }
           }}
-          className="w-20 h-7 rounded-[6px] bg-[#242424] border border-white/[0.14] text-[#f0f0f0] text-sm font-bold font-mono text-center focus:border-[#00e5a0] focus:outline-none"
+          className={`${large ? "w-28 h-9 text-base" : "w-20 h-7 text-sm"} rounded-[6px] bg-[#242424] border border-white/[0.14] text-[#f0f0f0] font-bold font-mono text-center focus:border-[#00e5a0] focus:outline-none`}
         />
-        <span style={{ fontSize: 11, color: "#666", minWidth: 20 }}>{unit}</span>
+        <span style={{ fontSize: large ? 13 : 11, color: "#666", minWidth: 20 }}>{unit}</span>
       </div>
       <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-        <div style={{ position: "relative", width: 80 }}>
-          <span style={{ position: "absolute", left: 6, top: "50%", transform: "translateY(-50%)", fontSize: 11, color: "#555", pointerEvents: "none" }}>$</span>
+        <div style={{ position: "relative", width: large ? 110 : 80 }}>
+          <span style={{ position: "absolute", left: 6, top: "50%", transform: "translateY(-50%)", fontSize: large ? 13 : 11, color: "#555", pointerEvents: "none" }}>$</span>
           <input
             type="number"
             inputMode="decimal"
@@ -88,10 +90,10 @@ function BulkQtyInput({ value, unit, price, onChange }: { value: number; unit: s
               setAmtStr((value * price).toFixed(2));
             }}
             style={{ paddingLeft: 14 }}
-            className="w-full h-7 rounded-[6px] bg-[#242424] border border-white/[0.14] text-[#f0f0f0] text-sm font-mono text-center focus:border-[#00e5a0] focus:outline-none"
+            className={`w-full ${large ? "h-9 text-base" : "h-7 text-sm"} rounded-[6px] bg-[#242424] border border-white/[0.14] text-[#f0f0f0] font-mono text-center focus:border-[#00e5a0] focus:outline-none`}
           />
         </div>
-        <span style={{ fontSize: 11, color: "#444", minWidth: 20 }}>MXN</span>
+        <span style={{ fontSize: large ? 13 : 11, color: "#444", minWidth: 20 }}>MXN</span>
       </div>
     </div>
   );
@@ -379,8 +381,8 @@ export default function Scanner() {
           const badge = stockNone
             ? { bg: "rgba(255,107,107,0.1)", color: "#ff6b6b", label: "Sin stock" }
             : stockLow
-            ? { bg: "rgba(255,159,67,0.1)",  color: "#ff9f43", label: `${p.stock} uds` }
-            : { bg: "rgba(0,229,160,0.1)",   color: "#00e5a0", label: `${p.stock} uds` };
+            ? { bg: "rgba(255,159,67,0.1)",  color: "#ff9f43", label: `${p.stock} ${p.unit ?? "uds"}` }
+            : { bg: "rgba(0,229,160,0.1)",   color: "#00e5a0", label: `${p.stock} ${p.unit ?? "uds"}` };
           return (
             <div
               key={p.id}

@@ -22,6 +22,8 @@ import Subscription from "@/pages/Subscription";
 import SubscriptionSuccess from "@/pages/SubscriptionSuccess";
 import SubscriptionCancel from "@/pages/SubscriptionCancel";
 import Receipts from "@/pages/Receipts";
+import Barcodes from "@/pages/Barcodes";
+import SalesHistory from "@/pages/SalesHistory";
 import ForgotPassword from "@/pages/ForgotPassword";
 
 function RootRedirect() {
@@ -67,6 +69,8 @@ export default function App() {
             <Route path="/payment" element={<Payment />} />
             <Route path="/receipt" element={<Receipt />} />
             <Route path="/receipts" element={<Receipts />} />
+            <Route path="/barcodes" element={<Barcodes />} />
+            <Route path="/sales" element={<SalesHistory />} />
             <Route path="/settings" element={<Settings />} />
             <Route path="/subscription" element={<Subscription />} />
           </Route>

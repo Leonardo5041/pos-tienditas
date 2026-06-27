@@ -196,3 +196,44 @@ export function buildESCPOS(p: ESCPOSParams): Uint8Array {
 
   return new Uint8Array(b);
 }
+
+export function buildLabelESCPOS(params: {
+  storeName: string;
+  productName: string;
+  unit: string;
+  barcode: string;
+  copies: number;
+}): Uint8Array {
+  const { storeName, productName, unit, barcode, copies } = params;
+  const _ESC = 0x1b;
+  const _GS = 0x1d;
+  const lines: number[] = [];
+  const _enc = new TextEncoder();
+  const push = (b: number[] | Uint8Array) => lines.push(...Array.from(b));
+  const text = (s: string) => push(_enc.encode(s));
+
+  for (let c = 0; c < copies; c++) {
+    push([_ESC, 0x40]);
+    push([_ESC, 0x61, 0x01]);
+
+    push([_ESC, 0x45, 0x01]);
+    text(storeName.slice(0, 24) + "\n");
+    push([_ESC, 0x45, 0x00]);
+
+    push([_ESC, 0x45, 0x01]);
+    text(productName.slice(0, 48) + "\n");
+    push([_ESC, 0x45, 0x00]);
+
+    text(`[${unit}]\n`);
+
+    push([_GS, 0x68, 0x50]);
+    push([_GS, 0x77, 0x02]);
+    push([_GS, 0x48, 0x02]);
+    push([_GS, 0x6b, 67, 13]);
+    text(barcode);
+
+    text("\n\n");
+    push([_GS, 0x56, 0x01]);
+  }
+  return new Uint8Array(lines);
+}

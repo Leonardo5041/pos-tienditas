@@ -18,16 +18,24 @@ export const salesApi = {
       }
     ),
 
-  list: (params?: { from?: string; to?: string; limit?: number }) => {
-    const qs = params
-      ? new URLSearchParams(
-          Object.fromEntries(
-            Object.entries(params).filter(([, v]) => v !== undefined) as [string, string][]
-          )
-        ).toString()
-      : "";
+  list: (params?: {
+    from?: string;
+    to?: string;
+    limit?: number;
+    offset?: number;
+    cashier_id?: string;
+    payment_method?: string;
+  }) => {
+    const qs = new URLSearchParams();
+    if (params?.from) qs.set("from", params.from);
+    if (params?.to) qs.set("to", params.to);
+    if (params?.limit != null) qs.set("limit", String(params.limit));
+    if (params?.offset != null) qs.set("offset", String(params.offset));
+    if (params?.cashier_id) qs.set("cashier_id", params.cashier_id);
+    if (params?.payment_method) qs.set("payment_method", params.payment_method);
+    const qstr = qs.toString();
     return apiFetch<{ sales: Sale[]; total_amount: number; total_count: number }>(
-      `/api/v1/sales${qs ? "?" + qs : ""}`
+      `/api/v1/sales${qstr ? "?" + qstr : ""}`
     );
   },
 

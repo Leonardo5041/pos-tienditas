@@ -15,8 +15,11 @@ export type Sale = {
   id: string;
   total: number;
   payment_method: "cash" | "card" | "transfer";
+  cashier_id?: string;
+  cashier_name?: string;
   items: SaleItem[];
   created_at: string;
+  synced_offline?: boolean;
   offline?: boolean;
   warnings?: SaleWarning[];
 };

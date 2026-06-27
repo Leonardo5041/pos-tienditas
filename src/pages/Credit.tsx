@@ -461,7 +461,7 @@ export default function Credit() {
         <input
           className="mt-3 w-full bg-[#1a1a1a] border border-white/[0.08] rounded-[10px] px-4 h-11 text-[#f0f0f0] text-sm placeholder:text-[#666] focus:border-[#00e5a0] focus:outline-none"
           value={search}
-          onChange={(e) => setSearch(e.target.value)}
+          onChange={(e) => setSearch(e.target.value.toUpperCase())}
           placeholder="Buscar cliente..."
         />
       </div>

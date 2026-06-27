@@ -707,6 +707,8 @@ export default function Settings() {
           <LogOut size={16} color="#ff6b6b" />
           Cerrar sesión
         </button>
+
+        <p className="text-center text-[10px] text-[#2a2a2a] mt-6">Filipenses 4:13</p>
       </div>
 
       {/* Modales */}

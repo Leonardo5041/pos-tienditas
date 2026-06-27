@@ -10,7 +10,7 @@ export type ProductsPage = {
 };
 
 export const productsApi = {
-  list: (params?: { search?: string; low_stock?: boolean; page?: number; limit?: number }) => {
+  list: (params?: { search?: string; low_stock?: boolean; no_barcode?: boolean; generated?: boolean; page?: number; limit?: number }) => {
     const qs = params
       ? new URLSearchParams(
           Object.fromEntries(
@@ -57,4 +57,10 @@ export const productsApi = {
       method: "PUT",
       body: JSON.stringify(data),
     }),
+
+  generateBarcode: (id: string) =>
+    apiFetch<{ id: string; name: string; barcode: string }>(
+      `/api/v1/products/${id}/generate-barcode`,
+      { method: "POST" }
+    ),
 };
