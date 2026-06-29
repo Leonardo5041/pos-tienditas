@@ -83,11 +83,13 @@ export default function Barcodes() {
     const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
     JsBarcode(svg, barcode, {
       format: "EAN13",
-      width: 1.5,
-      height: 40,
+      width: 2.5,
+      height: 70,
       displayValue: true,
-      fontSize: 10,
-      margin: 2,
+      fontSize: 12,
+      margin: 5,
+      marginTop: 10,
+      marginBottom: 10,
       background: "white",
       lineColor: "black",
     });
@@ -107,15 +109,15 @@ export default function Barcodes() {
         }
         .lbl {
           width: 54mm;
-          padding: 3mm 2mm;
+          padding: 4mm 3mm;
           text-align: center;
           page-break-inside: avoid;
           border-bottom: 1px dashed #ccc;
         }
         .lbl-store { font-size:8pt; font-weight:bold }
-        .lbl-name  { font-size:9pt; font-weight:bold; word-break:break-word }
+        .lbl-name  { font-size:10pt; font-weight:bold; word-break:break-word }
         .lbl-unit  { font-size:8pt; color:#666 }
-        .lbl-bc svg { width:100%; max-width:54mm }
+        .lbl-bc svg { width:100%; height:20mm; max-width:56mm }
       }
     `;
 
@@ -432,14 +434,14 @@ export default function Barcodes() {
                     background: "white",
                     color: "black",
                     borderRadius: "8px",
-                    padding: "10px",
+                    padding: "14px 10px",
                     marginBottom: "8px",
                     textAlign: "center",
                     fontFamily: "monospace",
                   }}
                 >
                   <div style={{ fontSize: "10px", fontWeight: "bold" }}>{store?.name}</div>
-                  <div style={{ fontSize: "12px", fontWeight: "bold", wordBreak: "break-word" }}>
+                  <div style={{ fontSize: "13px", fontWeight: "bold", wordBreak: "break-word" }}>
                     {p.name}
                   </div>
                   <div style={{ fontSize: "9px", color: "#888" }}>{p.unit}</div>

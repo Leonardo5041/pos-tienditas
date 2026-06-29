@@ -220,19 +220,21 @@ export function buildLabelESCPOS(params: {
     text(storeName.slice(0, 24) + "\n");
     push([_ESC, 0x45, 0x00]);
 
+    push([_ESC, 0x21, 0x10]);
     push([_ESC, 0x45, 0x01]);
-    text(productName.slice(0, 48) + "\n");
+    text(productName.slice(0, 24) + "\n");
     push([_ESC, 0x45, 0x00]);
+    push([_ESC, 0x21, 0x00]);
 
     text(`[${unit}]\n`);
 
-    push([_GS, 0x68, 0x50]);
-    push([_GS, 0x77, 0x02]);
+    push([_GS, 0x68, 0x64]);
+    push([_GS, 0x77, 0x03]);
     push([_GS, 0x48, 0x02]);
     push([_GS, 0x6b, 67, 13]);
     text(barcode);
 
-    text("\n\n");
+    text("\n\n\n");
     push([_GS, 0x56, 0x01]);
   }
   return new Uint8Array(lines);

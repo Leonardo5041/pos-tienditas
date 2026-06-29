@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuthStore } from "@/stores/authStore";
@@ -100,14 +100,154 @@ const inputStyle: React.CSSProperties = {
   boxSizing: "border-box",
 };
 
+const DRAFT_KEY = "receipt_draft";
+
+const STEPS = [
+  { id: 1, icon: "📸", label: "Imagen recibida",       sublabel: "Preparando para análisis...",        duration: 800   },
+  { id: 2, icon: "🔍", label: "Leyendo el ticket",     sublabel: "Identificando texto y números...",   duration: 3000  },
+  { id: 3, icon: "🧠", label: "Analizando con IA",     sublabel: "Extrayendo productos y precios...",  duration: 4000  },
+  { id: 4, icon: "📦", label: "Identificando productos", sublabel: "Buscando en tu inventario...",     duration: 2500  },
+  { id: 5, icon: "✨", label: "Casi listo",             sublabel: "Preparando resultados...",           duration: 999999 },
+];
+
+function AITimeline({ isProcessing }: { isProcessing: boolean }) {
+  const [currentStep, setCurrentStep] = useState(0);
+  const [completedSteps, setCompletedSteps] = useState<number[]>([]);
+
+  useEffect(() => {
+    if (!isProcessing) return;
+
+    setCurrentStep(0);
+    setCompletedSteps([]);
+
+    let stepIndex = 0;
+    const timers: ReturnType<typeof setTimeout>[] = [];
+
+    const advance = () => {
+      if (stepIndex >= STEPS.length - 1) return;
+      const delay = STEPS[stepIndex].duration;
+      const timer = setTimeout(() => {
+        setCompletedSteps((prev) => [...prev, stepIndex]);
+        stepIndex++;
+        setCurrentStep(stepIndex);
+        advance();
+      }, delay);
+      timers.push(timer);
+    };
+
+    advance();
+    return () => timers.forEach(clearTimeout);
+  }, [isProcessing]);
+
+  return (
+    <div style={{ padding: "32px 24px", display: "flex", flexDirection: "column", alignItems: "center" }}>
+      <div style={{ fontSize: 18, fontWeight: 700, color: "#f0f0f0", marginBottom: 8, textAlign: "center" }}>
+        Procesando tu ticket
+      </div>
+      <div style={{ fontSize: 13, color: "#555", marginBottom: 32, textAlign: "center" }}>
+        La IA está analizando la imagen...
+      </div>
+
+      <div style={{ width: "100%", maxWidth: 320 }}>
+        {STEPS.map((step, idx) => {
+          const isCompleted = completedSteps.includes(idx);
+          const isCurrent   = currentStep === idx;
+          const isPending   = idx > currentStep;
+
+          return (
+            <div key={step.id} style={{ display: "flex", gap: 16 }}>
+              {/* Left column: icon circle + connector */}
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", flexShrink: 0 }}>
+                <div style={{
+                  width: 40, height: 40, borderRadius: "50%",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  fontSize: 18, flexShrink: 0,
+                  transition: "all 0.4s ease",
+                  background: isCompleted
+                    ? "rgba(0,229,160,0.15)"
+                    : isCurrent ? "rgba(0,229,160,0.08)" : "rgba(255,255,255,0.04)",
+                  border: isCompleted
+                    ? "2px solid #00e5a0"
+                    : isCurrent ? "2px solid rgba(0,229,160,0.4)" : "2px solid rgba(255,255,255,0.08)",
+                  animation: isCurrent ? "stepPulse 1.5s ease-in-out infinite" : "none",
+                }}>
+                  {isCompleted ? "✓" : step.icon}
+                </div>
+
+                {idx < STEPS.length - 1 && (
+                  <div style={{
+                    width: 2, height: 32,
+                    background: isCompleted ? "#00e5a0" : "rgba(255,255,255,0.08)",
+                    transition: "background 0.4s ease",
+                  }} />
+                )}
+              </div>
+
+              {/* Right column: label + sublabel */}
+              <div style={{
+                paddingTop: 8,
+                paddingBottom: idx < STEPS.length - 1 ? 32 : 0,
+                opacity: isPending ? 0.3 : 1,
+                transition: "opacity 0.3s ease",
+              }}>
+                <p style={{
+                  fontSize: 14, margin: "0 0 2px",
+                  fontWeight: isCurrent ? 700 : 500,
+                  color: isCompleted ? "#00e5a0" : isCurrent ? "#f0f0f0" : "#555",
+                  transition: "all 0.3s ease",
+                }}>
+                  {step.label}
+                </p>
+                {(isCurrent || isCompleted) && (
+                  <p style={{ fontSize: 12, color: "#555", margin: 0 }}>
+                    {step.sublabel}
+                  </p>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function loadDraft(): { step: Step; header: ReceiptHeader; items: LocalItem[] } | null {
+  try {
+    const raw = sessionStorage.getItem(DRAFT_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw) as { step: Step; header: ReceiptHeader; items: LocalItem[] };
+  } catch {
+    return null;
+  }
+}
+
+function clearDraft() {
+  sessionStorage.removeItem(DRAFT_KEY);
+}
+
 export default function Receipts() {
   const navigate = useNavigate();
   const { user } = useAuthStore();
   const queryClient = useQueryClient();
 
-  const [step, setStep] = useState<Step>("capture");
-  const [header, setHeader] = useState<ReceiptHeader>({ receipt_id: "", supplier: "", date: "", total: 0 });
-  const [items, setItems] = useState<LocalItem[]>([]);
+  const draft = loadDraft();
+
+  const [step, setStep] = useState<Step>(draft?.step ?? "capture");
+  const [header, setHeader] = useState<ReceiptHeader>(
+    draft?.header ?? { receipt_id: "", supplier: "", date: "", total: 0 }
+  );
+  const [items, setItems] = useState<LocalItem[]>(
+    (draft?.items ?? []).map((it) => ({
+      ...it,
+      searchResults: [],
+      searchQuery: "",
+      showDropdown: false,
+      catalogResults: [],
+      showCatalogDropdown: false,
+      catalogQuery: "",
+    }))
+  );
   const [error, setError] = useState<string | null>(null);
   const [confirmResult, setConfirmResult] = useState<ConfirmResult | null>(null);
   const [confirming, setConfirming] = useState(false);
@@ -119,6 +259,16 @@ export default function Receipts() {
   const addGalleryRef = useRef<HTMLInputElement>(null);
   const searchTimers = useRef<Record<number, ReturnType<typeof setTimeout>>>({});
   const [addingPhoto, setAddingPhoto] = useState(false);
+
+  useEffect(() => {
+    if (step === "capture" && items.length === 0) {
+      clearDraft();
+      return;
+    }
+    try {
+      sessionStorage.setItem(DRAFT_KEY, JSON.stringify({ step, header, items }));
+    } catch { /* storage full — ignore */ }
+  }, [step, header, items]);
 
   const role = user?.role;
   const canAccess = role === "owner" || role === "inventory";
@@ -398,6 +548,7 @@ export default function Receipts() {
         total_amount: header.total,
       });
 
+      clearDraft();
       queryClient.invalidateQueries({ queryKey: ["products"] });
       queryClient.invalidateQueries({ queryKey: ["expenses"] });
       queryClient.invalidateQueries({ queryKey: ["receipts"] });
@@ -410,6 +561,7 @@ export default function Receipts() {
   }
 
   function reset() {
+    clearDraft();
     setStep("capture");
     setHeader({ receipt_id: "", supplier: "", date: "", total: 0 });
     setItems([]);
@@ -423,8 +575,47 @@ export default function Receipts() {
 
   // ── CAPTURA ────────────────────────────────────────────────────────
   function renderCapture() {
+    const hasDraft = items.length > 0 || header.receipt_id !== "";
     return (
       <div style={{ padding: "24px 16px 16px" }}>
+        {hasDraft && (
+          <div style={{
+            background: "rgba(255,217,61,0.06)",
+            border: "1px solid rgba(255,217,61,0.2)",
+            borderRadius: 12,
+            padding: "12px 16px",
+            marginBottom: 16,
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+          }}>
+            <span style={{ fontSize: 13, color: "#ffd93d" }}>
+              ⏳ Ticket en progreso ({items.length} productos)
+            </span>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button
+                onClick={() => setStep("validation")}
+                style={{
+                  fontSize: 12, fontWeight: 600, padding: "5px 12px",
+                  borderRadius: 8, border: "1px solid rgba(255,217,61,0.3)",
+                  background: "rgba(255,217,61,0.1)", color: "#ffd93d", cursor: "pointer",
+                }}
+              >
+                Continuar
+              </button>
+              <button
+                onClick={reset}
+                style={{
+                  fontSize: 12, fontWeight: 600, padding: "5px 12px",
+                  borderRadius: 8, border: "1px solid rgba(255,107,107,0.2)",
+                  background: "rgba(255,107,107,0.06)", color: "#ff6b6b", cursor: "pointer",
+                }}
+              >
+                Descartar
+              </button>
+            </div>
+          </div>
+        )}
         <div
           style={{
             background: "#1a1a1a",
@@ -585,37 +776,7 @@ export default function Receipts() {
 
   // ── PROCESANDO ─────────────────────────────────────────────────────
   function renderProcessing() {
-    return (
-      <div
-        style={{
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          justifyContent: "center",
-          minHeight: "60vh",
-          padding: 24,
-          textAlign: "center",
-        }}
-      >
-        <div
-          style={{
-            width: 56,
-            height: 56,
-            borderRadius: "50%",
-            border: "3px solid rgba(0,229,160,0.15)",
-            borderTop: "3px solid #00e5a0",
-            animation: "spin 0.9s linear infinite",
-            marginBottom: 20,
-          }}
-        />
-        <p style={{ fontSize: 17, fontWeight: 700, color: "#f0f0f0", margin: 0 }}>
-          Analizando ticket con IA...
-        </p>
-        <p style={{ fontSize: 13, color: "#666", marginTop: 6 }}>
-          Esto puede tardar unos segundos
-        </p>
-      </div>
-    );
+    return <AITimeline isProcessing={step === "processing"} />;
   }
 
   // ── VALIDACIÓN ─────────────────────────────────────────────────────
@@ -1094,7 +1255,7 @@ export default function Receipts() {
                         <div style={{ marginBottom: 12 }}>
                           <label style={{ fontSize: 11, color: "#888", display: "block", marginBottom: 6 }}>Unidad de medida</label>
                           <div style={{ display: "flex", gap: 6 }}>
-                            {(["pza", "kg", "g"] as const).map((u) => (
+                            {(["pza", "kg"] as const).map((u) => (
                               <button
                                 key={u}
                                 onClick={() => updateItem(idx, {
@@ -1344,7 +1505,13 @@ export default function Receipts() {
 
   return (
     <div style={{ minHeight: "100vh", background: "#0f0f0f" }}>
-      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+      <style>{`
+        @keyframes spin { to { transform: rotate(360deg); } }
+        @keyframes stepPulse {
+          0%, 100% { box-shadow: 0 0 0 0 rgba(0,229,160,0.3); }
+          50%       { box-shadow: 0 0 0 8px rgba(0,229,160,0); }
+        }
+      `}</style>
 
       {/* Scanner overlay por item */}
       {scanningForIdx !== null && (
