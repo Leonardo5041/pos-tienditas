@@ -3,15 +3,16 @@ import { useAuthStore } from "@/stores/authStore";
 import type { Sale } from "@/types/sale";
 import { useBLEPrinter } from "../hooks/useBLEPrinter";
 import { buildESCPOS } from "@/lib/escpos";
-
+import { getPaymentLabel, getPaymentColor } from "@/lib/paymentMethods";
 
 type ReceiptState = { sale: Sale; offline: boolean } | null;
 
-const paymentLabels: Record<string, string> = {
-  cash: "Efectivo",
-  card: "Tarjeta",
-  transfer: "Transferencia",
-};
+function colorRgba(hex: string, alpha: number): string {
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  return `rgba(${r},${g},${b},${alpha})`;
+}
 
 export default function Receipt() {
   const location = useLocation();
@@ -49,26 +50,19 @@ export default function Receipt() {
   const time = _saleDate.toLocaleString("es-MX", { timeZone: "America/Mexico_City", hour: "2-digit", minute: "2-digit", hour12: true });
   const dateStr = _saleDate.toLocaleString("es-MX", { timeZone: "America/Mexico_City", day: "2-digit", month: "short", year: "numeric" });
   const shortId = sale.id.slice(0, 8).toUpperCase();
-  const payLabel = paymentLabels[sale.payment_method] ?? sale.payment_method;
+  const accentColor = offline ? "#ff9f43" : getPaymentColor(sale.payment_method);
+  const payLabel = getPaymentLabel(sale.payment_method);
 
   return (
     <div className="min-h-screen bg-[#0f0f0f] flex flex-col">
       {/* Status header */}
       <div
         className="px-4 py-3 text-center text-sm font-semibold"
-        style={
-          offline
-            ? {
-                background: "rgba(255,159,67,0.1)",
-                borderBottom: "1px solid rgba(255,159,67,0.2)",
-                color: "#ff9f43",
-              }
-            : {
-                background: "rgba(0,229,160,0.08)",
-                borderBottom: "1px solid rgba(0,229,160,0.15)",
-                color: "#00e5a0",
-              }
-        }
+        style={{
+          background: colorRgba(accentColor, offline ? 0.1 : 0.08),
+          borderBottom: `1px solid ${colorRgba(accentColor, offline ? 0.2 : 0.15)}`,
+          color: accentColor,
+        }}
       >
         {offline ? "📴 Guardada sin conexión" : "✓ Venta completada"}
       </div>
@@ -77,22 +71,15 @@ export default function Receipt() {
         {/* Icon */}
         <div
           className="w-20 h-20 rounded-full flex items-center justify-center mx-auto text-4xl"
-          style={
-            offline
-              ? {
-                  background: "rgba(255,159,67,0.1)",
-                  border: "1.5px solid rgba(255,159,67,0.25)",
-                }
-              : {
-                  background: "rgba(0,229,160,0.1)",
-                  border: "1.5px solid rgba(0,229,160,0.25)",
-                }
-          }
+          style={{
+            background: colorRgba(accentColor, 0.1),
+            border: `1.5px solid ${colorRgba(accentColor, 0.25)}`,
+          }}
         >
           {offline ? (
             "📴"
           ) : (
-            <span style={{ color: "#00e5a0", fontSize: "36px", lineHeight: 1 }}>✓</span>
+            <span style={{ color: accentColor, fontSize: "36px", lineHeight: 1 }}>✓</span>
           )}
         </div>
 
@@ -145,7 +132,7 @@ export default function Receipt() {
             style={{ borderTop: "1.5px solid rgba(255,255,255,0.1)" }}
           >
             <span className="text-sm font-semibold text-[#999]">Total</span>
-            <span className="text-xl font-bold text-[#00e5a0] font-mono">
+            <span className="text-xl font-bold font-mono" style={{ color: accentColor }}>
               ${sale.total.toFixed(2)}
             </span>
           </div>

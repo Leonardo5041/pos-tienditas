@@ -6,10 +6,12 @@ export type RegisterTicketParams = {
   result: {
     initial_amount: number;
     cash_sales: number;
+    cash_credit_payments: number;
     turno_expenses: number;
     expected_amount: number;
     declared_amount: number;
     difference: number;
+    credit_sales_generated: number;
   };
 };
 
@@ -55,6 +57,9 @@ export function buildRegisterTicket(p: RegisterTicketParams): Uint8Array {
 
   row("Fondo inicial", `$${p.result.initial_amount.toFixed(2)}`);
   row("Ventas efectivo", `+$${p.result.cash_sales.toFixed(2)}`);
+  if (p.result.cash_credit_payments > 0) {
+    row("Cobros de fiado", `+$${p.result.cash_credit_payments.toFixed(2)}`);
+  }
   if (p.result.turno_expenses > 0) {
     row("Gastos turno", `-$${p.result.turno_expenses.toFixed(2)}`);
   }
@@ -79,6 +84,17 @@ export function buildRegisterTicket(p: RegisterTicketParams): Uint8Array {
     p.result.difference > 0   ? "SOBRANTE EN CAJA" :
                                  "FALTANTE EN CAJA";
   pushText(b, resultLabel);
+
+  if (p.result.credit_sales_generated > 0) {
+    b.push(LF);
+    b.push(ESC, 0x61, 0x00);
+    pushText(b, separator());
+    b.push(LF);
+    row("Ventas a fiado", `$${p.result.credit_sales_generated.toFixed(2)}`);
+    pushText(b, "(no incluido arriba)");
+    b.push(LF);
+  }
+
   b.push(LF, LF, LF, GS, 0x56, 0x42, 0x05);
 
   return new Uint8Array(b);
@@ -116,6 +132,7 @@ const PAY_LABELS: Record<string, string> = {
   cash: "Efectivo",
   card: "Tarjeta",
   transfer: "Transferencia",
+  credit: "Fiado"
 };
 
 export type ESCPOSParams = {

@@ -7,6 +7,7 @@ import Modal from "@/components/Modal";
 import Navbar from "@/components/Navbar";
 import { useAuthStore } from "@/stores/authStore";
 import { apiFetch } from "@/lib/api";
+import { getPaymentLabel, getPaymentColor } from "@/lib/paymentMethods";
 
 type Tab = "daily" | "weekly" | "monthly" | "range"
 
@@ -57,12 +58,6 @@ const TABS: { key: Tab; label: string }[] = [
   { key: "monthly", label: "Este mes" },
   { key: "range",   label: "Seleccionar fechas" },
 ];
-
-const METHOD_CFG: Record<string, { label: string; color: string }> = {
-  cash:     { label: "Efectivo",      color: "#00e5a0" },
-  card:     { label: "Tarjeta",       color: "#74b9ff" },
-  transfer: { label: "Transferencia", color: "#ff9f43" },
-};
 
 const RANK_COLORS = ["#00e5a0", "#74b9ff", "#ff9f43", "#555", "#555"];
 
@@ -299,10 +294,10 @@ export default function Reports() {
                 style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)" }}
               >
                 <p className="text-[10px] font-semibold text-[#555] uppercase tracking-widest mb-1">Ganancia bruta</p>
-                {r.gross_profit > 0 ? (
+                {(r.gross_profit ?? 0) > 0 ? (
                   <>
                     <p className="text-2xl font-bold text-[#f0f0f0] font-mono leading-tight">
-                      ${r.gross_profit.toLocaleString("es-MX", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                      ${(r.gross_profit ?? 0).toLocaleString("es-MX", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
                     </p>
                     <p className="text-[10px] text-[#555] mt-1.5">precio − costo</p>
                   </>
@@ -332,13 +327,13 @@ export default function Reports() {
                 <p className="text-[10px] font-bold uppercase tracking-widest mb-1" style={{ color: "rgba(0,229,160,0.55)" }}>
                   💰 Ganancia neta
                 </p>
-                {r.gross_profit > 0 ? (
+                {(r.gross_profit ?? 0) > 0 ? (
                   <>
                     <p
                       className="text-2xl font-black font-mono leading-tight"
                       style={{ color: "#00e5a0", textShadow: "0 0 16px rgba(0,229,160,0.45)" }}
                     >
-                      ${(r.net_profit ?? r.gross_profit).toLocaleString("es-MX", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                      ${(r.net_profit ?? r.gross_profit ?? 0).toLocaleString("es-MX", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
                     </p>
                     {(r.total_expenses ?? 0) > 0 && (
                       <p className="text-[10px] mt-1" style={{ color: "rgba(0,229,160,0.45)" }}>
@@ -374,20 +369,20 @@ export default function Reports() {
             </div>
 
             {/* Top productos */}
-            {r.top_products.length > 0 && (
+            {(r.top_products?.length ?? 0) > 0 && (
               <div className="bg-[#1a1a1a] border border-white/[0.08] rounded-[14px] px-4 py-4">
                 <p className="text-xs font-semibold text-[#666] uppercase tracking-wider mb-4">
                   Top productos {tab === "daily" ? "del día" : tab === "weekly" ? "de la semana" : tab === "monthly" ? "del mes" : "del período"}
                 </p>
-                {r.top_products.map((p, i) => {
-                  const maxUnits = r.top_products[0].units_sold;
+                {r.top_products!.map((p, i) => {
+                  const maxUnits = r.top_products![0].units_sold;
                   const pct = maxUnits > 0 ? (p.units_sold / maxUnits) * 100 : 0;
                   const color = RANK_COLORS[i] ?? "#555";
                   return (
                     <div
                       key={i}
                       className="flex items-center gap-3 py-3"
-                      style={i < r.top_products.length - 1 ? { borderBottom: "1px solid rgba(255,255,255,0.05)" } : {}}
+                      style={i < r.top_products!.length - 1 ? { borderBottom: "1px solid rgba(255,255,255,0.05)" } : {}}
                     >
                       <span className="text-xs text-[#444] font-mono w-6 flex-shrink-0">#{i + 1}</span>
                       <span
@@ -410,30 +405,31 @@ export default function Reports() {
             )}
 
             {/* Métodos de pago */}
-            {r.payment_methods.length > 0 && (
+            {(r.payment_methods?.length ?? 0) > 0 && (
               <div className="bg-[#1a1a1a] border border-white/[0.08] rounded-[14px] px-4 py-4">
                 <p className="text-xs font-semibold text-[#666] uppercase tracking-wider mb-3">
                   Por método de pago
                 </p>
-                {r.payment_methods.map((pm, i) => {
-                  const cfg = METHOD_CFG[pm.method] ?? { label: pm.method, color: "#666" };
+                {r.payment_methods!.map((pm, i) => {
+                  const label = getPaymentLabel(pm.method);
+                  const color = getPaymentColor(pm.method);
                   const share = r.total_sales > 0 ? Math.round((pm.amount / r.total_sales) * 100) : 0;
                   return (
                     <div
                       key={pm.method}
                       className="py-3"
-                      style={i < r.payment_methods.length - 1 ? { borderBottom: "1px solid rgba(255,255,255,0.05)" } : {}}
+                      style={i < r.payment_methods!.length - 1 ? { borderBottom: "1px solid rgba(255,255,255,0.05)" } : {}}
                     >
                       <div className="flex items-center gap-2 mb-2">
-                        <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: cfg.color }} />
-                        <span className="text-sm text-[#f0f0f0] flex-1">{cfg.label}</span>
+                        <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: color }} />
+                        <span className="text-sm text-[#f0f0f0] flex-1">{label}</span>
                         <span className="text-xs text-[#555] font-mono">{pm.count} ventas</span>
-                        <span className="text-sm font-bold font-mono" style={{ color: cfg.color }}>
+                        <span className="text-sm font-bold font-mono" style={{ color }}>
                           ${pm.amount.toLocaleString("es-MX", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
                         </span>
                       </div>
                       <div className="h-1 rounded-full w-full" style={{ background: "rgba(255,255,255,0.06)" }}>
-                        <div className="h-full rounded-full" style={{ width: `${share}%`, background: cfg.color }} />
+                        <div className="h-full rounded-full" style={{ width: `${share}%`, background: color }} />
                       </div>
                     </div>
                   );
@@ -442,7 +438,7 @@ export default function Reports() {
             )}
 
             {/* Stock bajo */}
-            {r.low_stock_alerts.length > 0 && (
+            {(r.low_stock_alerts?.length ?? 0) > 0 && (
               <div
                 className="rounded-[14px] px-4 py-4"
                 style={{ background: "rgba(255,159,67,0.06)", border: "1px solid rgba(255,159,67,0.2)" }}
@@ -450,11 +446,11 @@ export default function Reports() {
                 <p className="text-xs font-semibold text-[#ff9f43] uppercase tracking-wider mb-3">
                   ⚠ Stock bajo
                 </p>
-                {r.low_stock_alerts.map((a, i) => (
+                {r.low_stock_alerts!.map((a, i) => (
                   <div
                     key={a.id}
                     className="flex justify-between py-2"
-                    style={i < r.low_stock_alerts.length - 1 ? { borderBottom: "1px solid rgba(255,255,255,0.04)" } : {}}
+                    style={i < r.low_stock_alerts!.length - 1 ? { borderBottom: "1px solid rgba(255,255,255,0.04)" } : {}}
                   >
                     <span className="text-sm text-[#f0f0f0] truncate flex-1 mr-4">{a.name}</span>
                     <span className="text-xs text-[#ff9f43] font-mono flex-shrink-0">
@@ -477,8 +473,8 @@ export default function Reports() {
           maxWidth={420}
         >
           {(() => {
-            const netProfit   = r.net_profit ?? r.gross_profit;
-            const costOfGoods = r.total_sales - r.gross_profit;
+            const netProfit   = r.net_profit ?? r.gross_profit ?? 0;
+            const costOfGoods = r.total_sales - (r.gross_profit ?? 0);
             const withoutCost = r.products_without_cost ?? 0;
 
             return (
@@ -515,9 +511,9 @@ export default function Reports() {
                   <span className="text-sm font-semibold" style={{ color: "#f0f0f0" }}>Ganancia bruta</span>
                   <span
                     className="text-sm font-bold font-mono"
-                    style={{ color: r.gross_profit >= 0 ? "#00e5a0" : "#ff6b6b" }}
+                    style={{ color: (r.gross_profit ?? 0) >= 0 ? "#00e5a0" : "#ff6b6b" }}
                   >
-                    ${r.gross_profit.toFixed(2)}
+                    ${(r.gross_profit ?? 0).toFixed(2)}
                   </span>
                 </div>
 

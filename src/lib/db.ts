@@ -31,7 +31,12 @@ export const posDb = db;
 const MAX_RETRIES = 3;
 
 export const pendingSalesDb = {
-  add: (sale: PendingSale) => db.pendingSales.add(sale),
+  add: async (sale: PendingSale) => {
+    if (sale.payment_method === "credit") {
+      throw new Error("Las ventas a fiado no pueden guardarse offline");
+    }
+    return db.pendingSales.add(sale);
+  },
   getUnsynced: () => db.pendingSales.filter((s) => !s.synced && !s.failed).toArray(),
   markSynced: (id: string) => db.pendingSales.update(id, { synced: true }),
   incrementRetry: async (id: string, currentRetries: number) => {

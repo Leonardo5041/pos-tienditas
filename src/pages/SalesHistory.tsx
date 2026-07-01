@@ -7,20 +7,9 @@ import { salesApi } from "@/lib/sales";
 import { usersApi } from "@/lib/users";
 import Modal from "@/components/Modal";
 import type { Sale } from "@/types/sale";
+import { getPaymentLabel, getPaymentColor } from "@/lib/paymentMethods";
 
 const LIMIT = 20;
-
-const METHOD_LABELS: Record<string, string> = {
-  cash: "Efectivo",
-  card: "Tarjeta",
-  transfer: "Transferencia",
-};
-
-const METHOD_COLORS: Record<string, string> = {
-  cash: "#00e5a0",
-  card: "#74b9ff",
-  transfer: "#ff9f43",
-};
 
 function localDate(d: Date) {
   const y = d.getFullYear();
@@ -265,6 +254,7 @@ export default function SalesHistory() {
             <option value="cash">Efectivo</option>
             <option value="card">Tarjeta</option>
             <option value="transfer">Transferencia</option>
+            <option value="credit">Fiado</option>
           </select>
         </div>
       )}
@@ -414,12 +404,12 @@ export default function SalesHistory() {
                     width: "8px",
                     height: "8px",
                     borderRadius: "50%",
-                    background: METHOD_COLORS[sale.payment_method] ?? "#888",
+                    background: getPaymentColor(sale.payment_method),
                     flexShrink: 0,
                   }}
                 />
                 <span style={{ fontSize: "12px", color: "#666" }}>
-                  {METHOD_LABELS[sale.payment_method] ?? sale.payment_method}
+                  {getPaymentLabel(sale.payment_method)}
                 </span>
                 {isOwner && sale.cashier_name && (
                   <>
@@ -551,11 +541,11 @@ export default function SalesHistory() {
                       width: "8px",
                       height: "8px",
                       borderRadius: "50%",
-                      background: METHOD_COLORS[detail.payment_method] ?? "#888",
+                      background: getPaymentColor(detail.payment_method),
                     }}
                   />
                   <span style={{ fontSize: "13px", color: "#f0f0f0" }}>
-                    {METHOD_LABELS[detail.payment_method] ?? detail.payment_method}
+                    {getPaymentLabel(detail.payment_method)}
                   </span>
                 </div>
               </div>

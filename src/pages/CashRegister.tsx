@@ -36,12 +36,14 @@ const emptyClose = { declared_amount: "", notes: "" };
 type CloseStep = "declare" | "revealing" | "result";
 
 type CloseResult = {
-  initial_amount:  number;
-  cash_sales:      number;
-  turno_expenses:  number;
-  expected_amount: number;
-  declared_amount: number;
-  difference:      number;
+  initial_amount:          number;
+  cash_sales:              number;
+  cash_credit_payments:    number;
+  credit_sales_generated:  number;
+  turno_expenses:          number;
+  expected_amount:         number;
+  declared_amount:         number;
+  difference:              number;
 };
 
 export default function CashRegister() {
@@ -261,6 +263,12 @@ export default function CashRegister() {
                     </div>
                   </div>
 
+                  {(r.credit_sales_generated ?? 0) > 0 && (
+                    <div className="text-xs mt-1 pt-1" style={{ color: "#ff9f43", borderTop: "1px solid #2a2a2a" }}>
+                      +${fmtMXN(r.credit_sales_generated!)} en fiados generados (no incluido arriba)
+                    </div>
+                  )}
+
                   <div className="mt-3 flex justify-between items-center">
                     <p className="text-sm text-[#999]">
                       Declarado: {r.declared_amount !== null ? `$${fmtMXN(r.declared_amount)}` : "—"}
@@ -478,6 +486,12 @@ export default function CashRegister() {
                 <span className="text-sm text-[#666]">Ventas efectivo</span>
                 <span className="text-sm font-mono text-[#00e5a0]">+${fmtMXN(closeResult.cash_sales)}</span>
               </div>
+              {closeResult.cash_credit_payments > 0 && (
+                <div className="flex justify-between py-1.5">
+                  <span className="text-sm text-[#666]">Cobros de fiado</span>
+                  <span className="text-sm font-mono text-[#74b9ff]">+${fmtMXN(closeResult.cash_credit_payments)}</span>
+                </div>
+              )}
               {closeResult.turno_expenses > 0 && (
                 <div className="flex justify-between py-1.5">
                   <span className="text-sm text-[#666]">Gastos del turno</span>
@@ -495,6 +509,20 @@ export default function CashRegister() {
                 <span className="text-sm text-[#666]">Tu declaración</span>
                 <span className="text-sm font-mono text-[#f0f0f0]">${fmtMXN(closeResult.declared_amount)}</span>
               </div>
+
+              {closeResult.credit_sales_generated > 0 && (
+                <div className="mt-2 pt-2" style={{ borderTop: "1px solid rgba(255,255,255,0.04)" }}>
+                  <div className="flex justify-between py-1">
+                    <span className="text-sm text-[#666]">Ventas a fiado (informativo)</span>
+                    <span className="text-sm font-mono" style={{ color: "#ff9f43" }}>
+                      ${fmtMXN(closeResult.credit_sales_generated)}
+                    </span>
+                  </div>
+                  <span className="text-xs block mt-0.5" style={{ color: "#555" }}>
+                    No incluido en el total esperado — aún no cobrado
+                  </span>
+                </div>
+              )}
 
               <div style={{ height: 1, background: "rgba(255,255,255,0.06)", margin: "6px 0" }} />
 

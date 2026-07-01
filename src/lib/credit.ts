@@ -7,6 +7,9 @@ export const creditApi = {
     return apiFetch<CreditAccount[]>(`/api/v1/credit${qs}`);
   },
 
+  search: (query: string) =>
+    apiFetch<CreditAccount[]>(`/api/v1/credit?search=${encodeURIComponent(query)}`),
+
   summary: () =>
     apiFetch<{ total_owed: number; accounts_count: number; overdue_count: number }>(
       "/api/v1/credit/summary"
@@ -24,10 +27,10 @@ export const creditApi = {
       body: JSON.stringify({ amount, note }),
     }),
 
-  pay: (id: string, amount: number) =>
+  pay: (id: string, amount: number, paymentMethod?: string) =>
     apiFetch<{ id: string; balance_new: number }>(`/api/v1/credit/${id}/pay`, {
       method: "POST",
-      body: JSON.stringify({ amount }),
+      body: JSON.stringify({ amount, payment_method: paymentMethod ?? "cash" }),
     }),
 
   transactions: (id: string) =>

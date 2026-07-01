@@ -73,6 +73,10 @@ export default function Inventory() {
   const [showOptionsSheet, setShowOptionsSheet] = useState(false);
   const [showPendingModal, setShowPendingModal] = useState(false);
   const [showLowStock, setShowLowStock] = useState(false);
+  const [showInactive, setShowInactive] = useState(false);
+  const [inactiveProduct, setInactiveProduct] = useState<(Product & { is_inactive?: boolean }) | null>(null);
+  const [showInactiveModal, setShowInactiveModal] = useState(false);
+  const [reactivating, setReactivating] = useState(false);
 
   const { user } = useAuthStore();
   const isOwner = user?.role === "owner";
@@ -113,8 +117,8 @@ export default function Inventory() {
   }, [isOffline, searchQuery, cacheVersion]);
 
   const { data: fetchedData, isLoading } = useQuery<ProductsPage>({
-    queryKey: ["products", searchQuery, page],
-    queryFn: () => productsApi.list({ ...(searchQuery ? { search: searchQuery } : {}), page }),
+    queryKey: ["products", searchQuery, page, showInactive],
+    queryFn: () => productsApi.list({ ...(searchQuery ? { search: searchQuery } : {}), page, active: showInactive ? false : true }),
     enabled: !isOffline,
   });
   const fetchedProducts = fetchedData?.products ?? [];
@@ -136,7 +140,7 @@ export default function Inventory() {
 
   const products = isOffline ? cachedProducts : fetchedProducts;
 
-  const displayProducts = showLowStock
+  const displayProducts = (!showInactive && showLowStock)
     ? [...products]
         .filter((p) => p.stock <= p.low_stock_threshold)
         .sort((a, b) => a.stock - b.stock)
@@ -158,6 +162,12 @@ export default function Inventory() {
     const code = normalizeBarcode(rawCode);
     try {
       const product = await productsApi.getByBarcode(code);
+      if (product.is_inactive) {
+        setShowScanner(false);
+        setInactiveProduct(product);
+        setShowInactiveModal(true);
+        return;
+      }
       setEditingProduct(product);
       setScannedBarcode(null);
       setCatalogData(null);
@@ -237,6 +247,32 @@ export default function Inventory() {
       showToast("Producto eliminado");
     } catch (err: unknown) {
       alert("Error al eliminar: " + (err instanceof Error ? err.message : String(err)));
+    }
+  };
+
+  const handleReactivate = async () => {
+    if (!inactiveProduct) return;
+    setReactivating(true);
+    try {
+      await productsApi.reactivate(inactiveProduct.id);
+      queryClient.invalidateQueries({ queryKey: ["products"] });
+      setShowInactiveModal(false);
+      setInactiveProduct(null);
+      showToast("Producto reactivado");
+    } catch (err: unknown) {
+      alert("Error al reactivar: " + (err instanceof Error ? err.message : String(err)));
+    } finally {
+      setReactivating(false);
+    }
+  };
+
+  const handleReactivateFromList = async (product: Product) => {
+    try {
+      await productsApi.reactivate(product.id);
+      queryClient.invalidateQueries({ queryKey: ["products"] });
+      showToast("✅ Producto reactivado");
+    } catch (err: unknown) {
+      alert("Error al reactivar: " + (err instanceof Error ? err.message : String(err)));
     }
   };
 
@@ -348,6 +384,25 @@ export default function Inventory() {
             className="w-full h-11 pl-10 pr-4 rounded-[10px] bg-[#1a1a1a] border border-white/[0.08] text-[#f0f0f0] placeholder:text-[#666] focus:border-[#00e5a0] focus:outline-none focus:ring-1 focus:ring-[#00e5a0]/30"
           />
         </div>
+        <div className="mt-2 flex items-center gap-2">
+          {showInactive ? (
+            <button
+              onClick={() => { setShowInactive(false); setPage(1); }}
+              className="text-sm px-3 py-1.5 rounded-full"
+              style={{ background: "rgba(255,107,107,0.1)", border: "1px solid rgba(255,107,107,0.2)", color: "#ff6b6b" }}
+            >
+              ← Ver activos
+            </button>
+          ) : (
+            <button
+              onClick={() => { setShowInactive(true); setPage(1); setShowLowStock(false); }}
+              className="text-sm px-3 py-1.5 rounded-full"
+              style={{ background: "#242424", border: "1px solid rgba(255,255,255,0.12)", color: "#555" }}
+            >
+              Ver productos desactivados
+            </button>
+          )}
+        </div>
       </header>
 
       {lowStockCount > 0 && !showLowStock && (
@@ -378,6 +433,15 @@ export default function Inventory() {
         </div>
       )}
 
+      {showInactive && (
+        <div
+          className="mx-4 mt-3 px-4 py-2 rounded-[10px] text-xs text-[#ff6b6b]"
+          style={{ background: "rgba(255,107,107,0.06)", border: "1px solid rgba(255,107,107,0.15)" }}
+        >
+          Mostrando productos desactivados. Estos productos no aparecen en ventas ni búsquedas.
+        </div>
+      )}
+
       <div className="px-4 mt-3 flex flex-col gap-2">
         {isLoading ? (
           <>
@@ -396,6 +460,7 @@ export default function Inventory() {
             <div
               key={product.id}
               className="bg-[#1a1a1a] border border-white/[0.08] rounded-[10px] px-4 py-3 flex items-center gap-3 active:bg-[#242424] transition-colors"
+              style={showInactive ? { opacity: 0.7 } : undefined}
             >
               <div className="text-2xl w-10 text-center flex-shrink-0">📦</div>
               <div className="flex-1 min-w-0">
@@ -409,9 +474,24 @@ export default function Inventory() {
                   ${product.price.toFixed(2)}
                 </p>
                 <div className="mt-1">
-                  <StockBadge p={product} />
+                  {showInactive ? (
+                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs bg-[#ff6b6b]/[0.10] text-[#ff6b6b]">
+                      Desactivado
+                    </span>
+                  ) : (
+                    <StockBadge p={product} />
+                  )}
                 </div>
               </div>
+              {showInactive && (
+                <button
+                  onClick={() => handleReactivateFromList(product)}
+                  className="text-xs px-3 py-1.5 rounded-full font-semibold flex-shrink-0"
+                  style={{ background: "rgba(0,229,160,0.1)", border: "1px solid rgba(0,229,160,0.2)", color: "#00e5a0" }}
+                >
+                  Reactivar
+                </button>
+              )}
               {canEdit && (
                 <button
                   onClick={() => {
@@ -560,24 +640,45 @@ export default function Inventory() {
           )}
 
           {isOwner && (
-            <div
-              onClick={() => {
-                setShowOptionsSheet(false);
-                setTimeout(() => confirmarEliminar(), 200);
-              }}
-              style={{
-                display: "flex", alignItems: "center", gap: "16px",
-                padding: "16px", borderRadius: "12px",
-                background: "rgba(255,107,107,0.06)", border: "1px solid rgba(255,107,107,0.15)",
-                cursor: "pointer",
-              }}
-            >
-              <Trash2 size={20} color="#ff6b6b" />
-              <div>
-                <div style={{ fontSize: "14px", fontWeight: 600, color: "#ff6b6b" }}>Eliminar producto</div>
-                <div style={{ fontSize: "12px", color: "rgba(255,107,107,0.6)", marginTop: "2px" }}>El producto dejará de aparecer</div>
+            showInactive ? (
+              <div
+                onClick={async () => {
+                  setShowOptionsSheet(false);
+                  if (selectedProduct) await handleReactivateFromList(selectedProduct);
+                }}
+                style={{
+                  display: "flex", alignItems: "center", gap: "16px",
+                  padding: "16px", borderRadius: "12px",
+                  background: "rgba(0,229,160,0.06)", border: "1px solid rgba(0,229,160,0.15)",
+                  cursor: "pointer",
+                }}
+              >
+                <span style={{ fontSize: "20px" }}>♻️</span>
+                <div>
+                  <div style={{ fontSize: "14px", fontWeight: 600, color: "#00e5a0" }}>Reactivar producto</div>
+                  <div style={{ fontSize: "12px", color: "rgba(0,229,160,0.6)", marginTop: "2px" }}>El producto vuelve a aparecer en ventas</div>
+                </div>
               </div>
-            </div>
+            ) : (
+              <div
+                onClick={() => {
+                  setShowOptionsSheet(false);
+                  setTimeout(() => confirmarEliminar(), 200);
+                }}
+                style={{
+                  display: "flex", alignItems: "center", gap: "16px",
+                  padding: "16px", borderRadius: "12px",
+                  background: "rgba(255,107,107,0.06)", border: "1px solid rgba(255,107,107,0.15)",
+                  cursor: "pointer",
+                }}
+              >
+                <Trash2 size={20} color="#ff6b6b" />
+                <div>
+                  <div style={{ fontSize: "14px", fontWeight: 600, color: "#ff6b6b" }}>Eliminar producto</div>
+                  <div style={{ fontSize: "12px", color: "rgba(255,107,107,0.6)", marginTop: "2px" }}>El producto dejará de aparecer</div>
+                </div>
+              </div>
+            )
           )}
 
           <button
@@ -615,6 +716,37 @@ export default function Inventory() {
               }}
             />
           ))}
+        </div>
+      </Modal>
+
+      <Modal
+        isOpen={showInactiveModal}
+        onClose={() => { setShowInactiveModal(false); setInactiveProduct(null); }}
+        title="Producto desactivado"
+      >
+        <div className="mb-4">
+          <p className="text-base font-semibold text-[#f0f0f0] truncate">{inactiveProduct?.name}</p>
+          <p className="text-xs text-[#666] font-mono mt-1">{inactiveProduct?.barcode ?? "Sin código"}</p>
+          <p className="text-sm font-mono text-[#f0f0f0] mt-2">${inactiveProduct?.price.toFixed(2)}</p>
+        </div>
+        <p className="text-sm text-[#999] mb-5">
+          Este producto fue eliminado del inventario. Al reactivarlo vuelve a aparecer en ventas e inventario.
+        </p>
+        <div className="flex gap-3">
+          <button
+            onClick={() => { setShowInactiveModal(false); setInactiveProduct(null); }}
+            className="flex-1 h-12 rounded-[10px] bg-[#242424] border border-white/[0.14] text-[#f0f0f0] font-semibold"
+          >
+            Cancelar
+          </button>
+          <button
+            onClick={handleReactivate}
+            disabled={reactivating}
+            className="flex-1 h-12 rounded-[10px] font-bold disabled:opacity-40 disabled:cursor-not-allowed"
+            style={{ background: "#ff9f43", color: "#000" }}
+          >
+            {reactivating ? "Reactivando..." : "Reactivar producto"}
+          </button>
         </div>
       </Modal>
 

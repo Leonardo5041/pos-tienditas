@@ -77,9 +77,16 @@ function NewClientModal({ onClose }: { onClose: () => void }) {
 
 // ── modal: pago ────────────────────────────────────────────────────────────
 
+const payMethodOptions = [
+  { value: "cash",     icon: "💵", label: "Efectivo" },
+  { value: "card",     icon: "💳", label: "Tarjeta" },
+  { value: "transfer", icon: "📱", label: "Transferencia" },
+];
+
 function PayModal({ account, onClose }: { account: CreditAccount; onClose: () => void }) {
   const qc = useQueryClient();
   const [amount, setAmount] = useState("");
+  const [payMethod, setPayMethod] = useState("cash");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -90,7 +97,7 @@ function PayModal({ account, onClose }: { account: CreditAccount; onClose: () =>
     setLoading(true);
     setError(null);
     try {
-      await creditApi.pay(account.id, num);
+      await creditApi.pay(account.id, num, payMethod);
       qc.invalidateQueries({ queryKey: ["credit"] });
       onClose();
     } catch (err) {
@@ -123,6 +130,31 @@ function PayModal({ account, onClose }: { account: CreditAccount; onClose: () =>
           {num > account.balance && (
             <p className="text-xs text-[#ff6b6b] mt-1">El pago excede la deuda actual</p>
           )}
+        </div>
+        <div>
+          <label className={labelCls}>Método de pago</label>
+          <div className="flex gap-2">
+            {payMethodOptions.map((opt) => {
+              const sel = payMethod === opt.value;
+              return (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => setPayMethod(opt.value)}
+                  className="flex-1 flex flex-col items-center gap-1 py-2.5 rounded-[10px] border transition-all"
+                  style={{
+                    borderColor: sel ? "#00e5a0" : "rgba(255,255,255,0.08)",
+                    background:  sel ? "rgba(0,229,160,0.08)" : "#242424",
+                  }}
+                >
+                  <span className="text-lg">{opt.icon}</span>
+                  <span className="text-xs font-semibold" style={{ color: sel ? "#00e5a0" : "#666" }}>
+                    {opt.label}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
         </div>
         {error && <p className="text-xs text-[#ff6b6b]">{error}</p>}
         <button

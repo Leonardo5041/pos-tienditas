@@ -60,7 +60,7 @@ export default function PendingProductCard({ product, onResolved }: Props) {
       <div style={{ display: "flex", gap: 8 }}>
         <div style={{ flex: 1 }}>
           <label style={{ fontSize: 10, color: "#666", textTransform: "uppercase", letterSpacing: "0.06em", display: "block", marginBottom: 4 }}>
-            Costo
+            Precio de compra
           </label>
           <div style={{ position: "relative" }}>
             <span style={{ position: "absolute", left: 8, top: "50%", transform: "translateY(-50%)", color: "#555", fontSize: 13 }}>$</span>

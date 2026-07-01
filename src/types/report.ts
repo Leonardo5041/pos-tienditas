@@ -26,16 +26,16 @@ export type DailyReport = {
   total_sales: number;
   transaction_count: number;
   avg_ticket: number;
-  gross_profit: number;
-  net_profit: number;
-  total_expenses: number;
-  products_without_cost: number;
-  yesterday_total: number;
-  yesterday_count: number;
+  gross_profit?: number;
+  net_profit?: number;
+  total_expenses?: number;
+  products_without_cost?: number;
+  yesterday_total?: number;
+  yesterday_count?: number;
   sales_by_hour: HourSale[];
-  top_products: TopProduct[];
-  payment_methods: PaymentMethodStat[];
-  low_stock_alerts: LowStockAlert[];
+  top_products?: TopProduct[];
+  payment_methods?: PaymentMethodStat[];
+  low_stock_alerts?: LowStockAlert[];
 };
 
 export type WeeklyReport = DailyReport & {

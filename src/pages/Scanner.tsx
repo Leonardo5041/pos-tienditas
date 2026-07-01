@@ -118,6 +118,10 @@ export default function Scanner() {
   const [unknownPrice, setUnknownPrice] = useState("");
   const [unknownError, setUnknownError] = useState("");
   const [isCreating, setIsCreating] = useState(false);
+
+  const [inactiveProduct, setInactiveProduct] = useState<(Product & { is_inactive?: boolean }) | null>(null);
+  const [showInactiveModal, setShowInactiveModal] = useState(false);
+  const [reactivating, setReactivating] = useState(false);
   const prevItemCount = useRef(0);
 
   const [searchQuery, setSearchQuery] = useState("");
@@ -160,6 +164,12 @@ export default function Scanner() {
 
     try {
       const product = await productsApi.getByBarcode(code);
+      if (product.is_inactive) {
+        setFeedback(null);
+        setInactiveProduct(product);
+        setShowInactiveModal(true);
+        return;
+      }
       addItem(product);
       setLastAddedName(product.name);
       setFeedback({ msg: `${product.name} agregado`, kind: "ok" });
@@ -303,6 +313,25 @@ export default function Scanner() {
       setExpressError(err instanceof Error ? err.message : "Error al agregar");
     } finally {
       setExpressLoading(false);
+    }
+  };
+
+  const handleReactivateAndAdd = async () => {
+    if (!inactiveProduct) return;
+    setReactivating(true);
+    try {
+      const updated = await productsApi.reactivate(inactiveProduct.id);
+      addItem({ ...inactiveProduct, ...updated });
+      setLastAddedName(updated.name);
+      setFeedback({ msg: `${updated.name} reactivado y agregado`, kind: "ok" });
+      setTimeout(() => setFeedback(null), 2000);
+      setShowInactiveModal(false);
+      setInactiveProduct(null);
+    } catch {
+      setFeedback({ msg: "Error al reactivar", kind: "err" });
+      setTimeout(() => setFeedback(null), 2000);
+    } finally {
+      setReactivating(false);
     }
   };
 
@@ -983,6 +1012,36 @@ export default function Scanner() {
             className="flex-1 h-12 rounded-[10px] bg-[#00e5a0] text-black font-bold disabled:opacity-40 disabled:cursor-not-allowed"
           >
             {isCreating ? "Agregando..." : "⚡ Agregar"}
+          </button>
+        </div>
+      </Modal>
+
+      <Modal
+        isOpen={showInactiveModal}
+        onClose={() => { setShowInactiveModal(false); setInactiveProduct(null); }}
+      >
+        <div className="mb-4">
+          <p className="text-xs font-semibold text-[#ff9f43] mb-1">⚠ Producto desactivado</p>
+          <p className="text-base font-semibold text-[#f0f0f0] truncate">{inactiveProduct?.name}</p>
+          <p className="text-xs text-[#666] font-mono mt-1">{inactiveProduct?.barcode}</p>
+        </div>
+        <p className="text-sm text-[#999] mb-4">
+          Este producto fue eliminado del inventario. Puedes reactivarlo para volver a usarlo.
+        </p>
+        <div className="flex gap-3">
+          <button
+            onClick={() => { setShowInactiveModal(false); setInactiveProduct(null); }}
+            className="flex-1 h-12 rounded-[10px] bg-[#242424] border border-white/[0.14] text-[#f0f0f0] font-semibold"
+          >
+            Cancelar
+          </button>
+          <button
+            onClick={handleReactivateAndAdd}
+            disabled={reactivating}
+            className="flex-1 h-12 rounded-[10px] font-bold disabled:opacity-40 disabled:cursor-not-allowed"
+            style={{ background: "#ff9f43", color: "#000" }}
+          >
+            {reactivating ? "Reactivando..." : "Reactivar y agregar"}
           </button>
         </div>
       </Modal>

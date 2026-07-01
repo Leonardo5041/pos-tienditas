@@ -10,7 +10,7 @@ export type ProductsPage = {
 };
 
 export const productsApi = {
-  list: (params?: { search?: string; low_stock?: boolean; no_barcode?: boolean; generated?: boolean; page?: number; limit?: number }) => {
+  list: (params?: { search?: string; low_stock?: boolean; no_barcode?: boolean; generated?: boolean; page?: number; limit?: number; active?: boolean }) => {
     const qs = params
       ? new URLSearchParams(
           Object.fromEntries(
@@ -24,7 +24,10 @@ export const productsApi = {
   },
 
   getByBarcode: (code: string) =>
-    apiFetch<Product>(`/api/v1/products/barcode/${code}`),
+    apiFetch<Product & { is_inactive?: boolean }>(`/api/v1/products/barcode/${code}`),
+
+  reactivate: (id: string) =>
+    apiFetch<Product>(`/api/v1/products/${id}/reactivate`, { method: "POST" }),
 
   create: (data: CreateProductInput) =>
     apiFetch<Product>("/api/v1/products", {

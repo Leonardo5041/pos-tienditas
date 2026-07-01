@@ -10,17 +10,12 @@ import { registersApi } from "@/lib/registers";
 import type { Sale } from "@/types/sale";
 import Modal from "@/components/Modal";
 import Navbar from "@/components/Navbar";
+import { getPaymentLabel, getPaymentColor } from "@/lib/paymentMethods";
 
 const roleLabel: Record<string, string> = {
   owner:     "Propietario",
   inventory: "Inventario",
   cashier:   "Cajero",
-};
-
-const paymentConfig: Record<string, { label: string; color: string }> = {
-  cash:     { label: "Efectivo",      color: "#00e5a0" },
-  card:     { label: "Tarjeta",       color: "#74b9ff" },
-  transfer: { label: "Transferencia", color: "#ff9f43" },
 };
 
 function relativeTime(s: string) {
@@ -63,6 +58,7 @@ export default function Dashboard() {
 
   const [selectedSale, setSelectedSale] = useState<Sale | null>(null);
   const [saleLoading, setSaleLoading] = useState(false);
+  const [showProfitModal, setShowProfitModal] = useState(false);
 
   const handleSaleClick = async (id: string) => {
     setSaleLoading(true);
@@ -76,6 +72,7 @@ export default function Dashboard() {
 
   const salesPct   = report ? pctDiff(report.total_sales, report.yesterday_total ?? 0) : null;
   const countDiff  = report ? report.transaction_count - (report.yesterday_count ?? 0) : null;
+
 
   const qualifiesForProfit = user?.role === "owner" &&
     ["recomendado", "oro"].includes(store?.effective_plan ?? "");
@@ -173,8 +170,9 @@ export default function Dashboard() {
 
               {/* Ganancia hoy — solo owner plan recomendado/oro */}
               {qualifiesForProfit && (
-                <div
-                  className="rounded-[16px] px-4 py-4 relative overflow-hidden"
+                <button
+                  onClick={() => setShowProfitModal(true)}
+                  className="rounded-[16px] px-4 py-4 relative overflow-hidden text-left w-full"
                   style={{
                     background: "linear-gradient(135deg, rgba(0,229,160,0.13) 0%, rgba(0,229,160,0.05) 100%)",
                     border:     "1.5px solid rgba(0,229,160,0.35)",
@@ -205,7 +203,7 @@ export default function Dashboard() {
                   ) : (
                     <p className="text-2xl font-black font-mono text-[#2a2a2a] leading-tight">$—</p>
                   )}
-                </div>
+                </button>
               )}
             </div>
 
@@ -284,11 +282,11 @@ export default function Dashboard() {
                 <span className="text-lg mt-0.5 flex-shrink-0">⚠️</span>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-semibold text-[#ff9f43]">
-                    {report.low_stock_alerts.length} producto{report.low_stock_alerts.length !== 1 ? "s" : ""} con stock bajo
+                    {report.low_stock_alerts!.length} producto{report.low_stock_alerts!.length !== 1 ? "s" : ""} con stock bajo
                   </p>
                   <p className="text-xs text-[#999] mt-0.5 truncate">
-                    {report.low_stock_alerts.slice(0, 3).map((a) => `${a.name} (${a.stock} uds)`).join(" · ")}
-                    {report.low_stock_alerts.length > 3 ? "..." : ""}
+                    {report.low_stock_alerts!.slice(0, 3).map((a) => `${a.name} (${a.stock} uds)`).join(" · ")}
+                    {report.low_stock_alerts!.length > 3 ? "..." : ""}
                   </p>
                 </div>
               </button>
@@ -311,7 +309,8 @@ export default function Dashboard() {
           ) : (
             <div className="bg-[#1a1a1a] border border-white/[0.08] rounded-[14px] overflow-hidden">
               {recentSales.map((sale, i) => {
-                const cfg = paymentConfig[sale.payment_method] ?? { label: sale.payment_method, color: "#666" };
+                const label = getPaymentLabel(sale.payment_method);
+                const color = getPaymentColor(sale.payment_method);
                 return (
                   <button
                     key={sale.id}
@@ -319,13 +318,13 @@ export default function Dashboard() {
                     className="w-full px-4 py-3 flex items-center gap-3 text-left transition-colors hover:bg-white/[0.03] active:bg-white/[0.05]"
                     style={i < recentSales.length - 1 ? { borderBottom: "1px solid rgba(255,255,255,0.06)" } : {}}
                   >
-                    <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: cfg.color }} />
+                    <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: color }} />
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-semibold text-[#f0f0f0]">
                         Venta #{sale.id.slice(0, 6).toUpperCase()}
                       </p>
                       <p className="text-xs text-[#666] mt-0.5">
-                        {relativeTime(sale.created_at)} · {cfg.label}
+                        {relativeTime(sale.created_at)} · {label}
                       </p>
                     </div>
                     <span className="text-sm font-bold text-[#00e5a0] font-mono">
@@ -372,6 +371,64 @@ export default function Dashboard() {
         </button>
       </div>
 
+      {qualifiesForProfit && <Modal
+        isOpen={showProfitModal}
+        onClose={() => setShowProfitModal(false)}
+        maxWidth={360}
+      >
+        {report && (() => {
+          const creditAmt = ((report as unknown) as { credit_sales_amount?: number }).credit_sales_amount ?? 0;
+          const netProfit = report.net_profit ?? 0;
+          const grossProfit = report.gross_profit ?? 0;
+          const totalExpenses = report.total_expenses ?? 0;
+          return (
+            <>
+              <p className="text-sm font-bold text-[#f0f0f0] mb-3">Desglose de ganancia</p>
+
+              {creditAmt > 0 && (
+                <div
+                  className="rounded-[10px] px-3 py-2 mb-2"
+                  style={{ background: "rgba(255,107,107,0.06)", border: "1px solid rgba(255,107,107,0.15)" }}
+                >
+                  <div className="flex justify-between items-center">
+                    <span className="text-xs" style={{ color: "#ff6b6b" }}>📒 Incluye fiado pendiente de cobro</span>
+                    <span className="text-xs font-bold font-mono" style={{ color: "#ff6b6b" }}>
+                      ${creditAmt.toFixed(2)}
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              <div className="flex justify-between items-center px-3 py-2">
+                <span className="text-xs text-[#999]">Ganancia bruta</span>
+                <span className="text-xs font-bold font-mono text-[#f0f0f0]">${grossProfit.toFixed(2)}</span>
+              </div>
+
+              <div className="flex justify-between items-center px-3 py-2">
+                <span className="text-xs text-[#999]">Gastos</span>
+                <span className="text-xs font-bold font-mono" style={{ color: "#ff6b6b" }}>
+                  -${totalExpenses.toFixed(2)}
+                </span>
+              </div>
+
+              <div
+                className="flex justify-between items-center px-3 py-2 mt-1 rounded-[10px]"
+                style={{ background: "rgba(0,229,160,0.06)" }}
+              >
+                <span className="text-xs font-bold text-[#00e5a0]">Ganancia neta</span>
+                <span className="text-xs font-bold font-mono text-[#00e5a0]">${netProfit.toFixed(2)}</span>
+              </div>
+
+              {creditAmt > 0 && (
+                <p className="text-xs mt-1" style={{ color: "#666" }}>
+                  De estos ${netProfit.toFixed(2)}, ${creditAmt.toFixed(2)} aún no se han cobrado (fiado)
+                </p>
+              )}
+            </>
+          );
+        })()}
+      </Modal>}
+
       <Modal
         isOpen={!!selectedSale || saleLoading}
         onClose={() => setSelectedSale(null)}
@@ -381,7 +438,8 @@ export default function Dashboard() {
           <div className="py-10 text-center text-sm text-[#666]">Cargando...</div>
         )}
         {selectedSale && !saleLoading && (() => {
-          const cfg = paymentConfig[selectedSale.payment_method] ?? { label: selectedSale.payment_method, color: "#666" };
+          const label = getPaymentLabel(selectedSale.payment_method);
+          const color = getPaymentColor(selectedSale.payment_method);
           return (
             <>
               <div className="mb-4">
@@ -391,9 +449,9 @@ export default function Dashboard() {
                 </p>
                 <span
                   className="inline-block mt-1 text-xs font-semibold px-2 py-0.5 rounded-full"
-                  style={{ background: cfg.color + "22", color: cfg.color }}
+                  style={{ background: color + "22", color: color }}
                 >
-                  {cfg.label}
+                  {label}
                 </span>
               </div>
 

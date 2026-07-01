@@ -13,6 +13,8 @@ export type CashRegister = {
   notes:           string | null;
   opened_at:       string;
   closed_at:       string | null;
-  cash_sales:      number;
-  turno_expenses:  number;
+  cash_sales:              number;
+  turno_expenses:          number;
+  cash_credit_payments:    number;
+  credit_sales_generated:  number;
 };

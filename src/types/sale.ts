@@ -14,7 +14,7 @@ export type SaleWarning = {
 export type Sale = {
   id: string;
   total: number;
-  payment_method: "cash" | "card" | "transfer";
+  payment_method: "cash" | "card" | "transfer" | "credit";
   cashier_id?: string;
   cashier_name?: string;
   items: SaleItem[];
@@ -26,7 +26,8 @@ export type Sale = {
 
 export type CreateSaleInput = {
   items: { product_id: string; quantity: number }[];
-  payment_method: "cash" | "card" | "transfer";
+  payment_method: "cash" | "card" | "transfer" | "credit";
+  customer_id?: string;
 };
 
 export type PendingSale = CreateSaleInput & {
