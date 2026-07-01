@@ -5,7 +5,6 @@ import { BarChart, Bar, XAxis, YAxis, Cell, ResponsiveContainer, Tooltip } from 
 import { useAuthStore } from "@/stores/authStore";
 import { reportsApi } from "@/lib/reports";
 import { salesApi } from "@/lib/sales";
-import { expensesApi } from "@/lib/expenses";
 import { registersApi } from "@/lib/registers";
 import type { Sale } from "@/types/sale";
 import Modal from "@/components/Modal";
@@ -77,13 +76,6 @@ export default function Dashboard() {
   const qualifiesForProfit = user?.role === "owner" &&
     ["recomendado", "oro"].includes(store?.effective_plan ?? "");
 
-  const todayStr    = new Date().toLocaleDateString("sv", { timeZone: "America/Mexico_City" });
-  const tomorrowStr = (() => {
-    const d = new Date();
-    d.setDate(d.getDate() + 1);
-    return d.toLocaleDateString("sv", { timeZone: "America/Mexico_City" });
-  })();
-
   const { data: currentRegister } = useQuery({
     queryKey: ["registers", "current"],
     queryFn:  registersApi.current,
@@ -91,12 +83,6 @@ export default function Dashboard() {
     refetchInterval: 30000,
   });
 
-  const { data: profitData } = useQuery({
-    queryKey: ["expenses", "summary", "today", todayStr],
-    queryFn: () => expensesApi.summary({ from: todayStr, to: tomorrowStr }),
-    enabled: qualifiesForProfit,
-    refetchInterval: 30000,
-  });
 
   return (
     <div className="min-h-screen bg-[#0f0f0f] pb-24">
@@ -186,22 +172,16 @@ export default function Dashboard() {
                   <p className="text-[10px] font-bold uppercase tracking-widest mb-1" style={{ color: "rgba(0,229,160,0.55)" }}>
                     💰 Ganancia neta
                   </p>
-                  {profitData ? (
-                    <>
-                      <p
-                        className="text-2xl font-black font-mono leading-tight"
-                        style={{ color: "#00e5a0", textShadow: "0 0 16px rgba(0,229,160,0.45)" }}
-                      >
-                        ${profitData.profit.toLocaleString("es-MX", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
-                      </p>
-                      {profitData.profit < 0 && (report.products_without_cost ?? 0) > 0 && (
-                        <p className="text-xs mt-1" style={{ color: "#666" }}>
-                          ⚠️ {report.products_without_cost} producto{report.products_without_cost !== 1 ? "s" : ""} sin costo registrado pueden afectar este cálculo
-                        </p>
-                      )}
-                    </>
-                  ) : (
-                    <p className="text-2xl font-black font-mono text-[#2a2a2a] leading-tight">$—</p>
+                  <p
+                    className="text-2xl font-black font-mono leading-tight"
+                    style={{ color: "#00e5a0", textShadow: "0 0 16px rgba(0,229,160,0.45)" }}
+                  >
+                    ${(report.net_profit ?? 0).toFixed(2)}
+                  </p>
+                  {(report.net_profit ?? 0) < 0 && (report.products_without_cost ?? 0) > 0 && (
+                    <p className="text-xs mt-1" style={{ color: "#666" }}>
+                      ⚠️ {report.products_without_cost} producto{report.products_without_cost !== 1 ? "s" : ""} sin costo registrado pueden afectar este cálculo
+                    </p>
                   )}
                 </button>
               )}
@@ -407,7 +387,7 @@ export default function Dashboard() {
               <div className="flex justify-between items-center px-3 py-2">
                 <span className="text-xs text-[#999]">Gastos</span>
                 <span className="text-xs font-bold font-mono" style={{ color: "#ff6b6b" }}>
-                  -${totalExpenses.toFixed(2)}
+                  {totalExpenses > 0 ? `-$${totalExpenses.toFixed(2)}` : `$0.00`}
                 </span>
               </div>
 
@@ -421,7 +401,7 @@ export default function Dashboard() {
 
               {creditAmt > 0 && (
                 <p className="text-xs mt-1" style={{ color: "#666" }}>
-                  De estos ${netProfit.toFixed(2)}, ${creditAmt.toFixed(2)} aún no se han cobrado (fiado)
+                  De los ${report.total_sales.toFixed(2)} en ventas de hoy, ${creditAmt.toFixed(2)} aún no se han cobrado (fiado)
                 </p>
               )}
             </>

@@ -297,7 +297,7 @@ export default function Reports() {
                 {(r.gross_profit ?? 0) > 0 ? (
                   <>
                     <p className="text-2xl font-bold text-[#f0f0f0] font-mono leading-tight">
-                      ${(r.gross_profit ?? 0).toLocaleString("es-MX", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                      ${(r.gross_profit ?? 0).toFixed(2)}
                     </p>
                     <p className="text-[10px] text-[#555] mt-1.5">precio − costo</p>
                   </>
@@ -333,11 +333,11 @@ export default function Reports() {
                       className="text-2xl font-black font-mono leading-tight"
                       style={{ color: "#00e5a0", textShadow: "0 0 16px rgba(0,229,160,0.45)" }}
                     >
-                      ${(r.net_profit ?? r.gross_profit ?? 0).toLocaleString("es-MX", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                      ${(r.net_profit ?? r.gross_profit ?? 0).toFixed(2)}
                     </p>
                     {(r.total_expenses ?? 0) > 0 && (
                       <p className="text-[10px] mt-1" style={{ color: "rgba(0,229,160,0.45)" }}>
-                        −${(r.total_expenses as number).toLocaleString("es-MX", { minimumFractionDigits: 0 })} gastos
+                        −${(r.total_expenses as number).toFixed(2)} gastos
                       </p>
                     )}
                   </>
@@ -476,6 +476,8 @@ export default function Reports() {
             const netProfit   = r.net_profit ?? r.gross_profit ?? 0;
             const costOfGoods = r.total_sales - (r.gross_profit ?? 0);
             const withoutCost = r.products_without_cost ?? 0;
+            const totalExpenses = (r.total_expenses as number) ?? 0;
+            const creditAmt   = ((r as unknown) as { credit_sales_amount?: number }).credit_sales_amount ?? 0;
 
             return (
               <div className="flex flex-col gap-3">
@@ -523,7 +525,7 @@ export default function Reports() {
                   <div className="flex justify-between items-center px-4 py-3 rounded-[10px]" style={{ background: "#242424" }}>
                     <span className="text-sm text-[#999]">Gastos operativos</span>
                     <span className="text-sm font-mono" style={{ color: "#ff6b6b" }}>
-                      -{((r.total_expenses as number) ?? 0).toFixed(2)}
+                      {totalExpenses > 0 ? `-$${totalExpenses.toFixed(2)}` : `$0.00`}
                     </span>
                   </div>
                 </div>
@@ -555,6 +557,11 @@ export default function Reports() {
                 {withoutCost > 0 && (
                   <p className="text-xs text-center" style={{ color: "#ff9f43" }}>
                     Registra el costo de compra de tus productos para mayor precisión
+                  </p>
+                )}
+                {creditAmt > 0 && (
+                  <p className="text-xs text-center" style={{ color: "#666", marginTop: "8px" }}>
+                    {`De los $${r.total_sales.toFixed(2)} en ventas del período, $${creditAmt.toFixed(2)} aún no se han cobrado (fiado)`}
                   </p>
                 )}
               </div>
