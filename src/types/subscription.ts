@@ -67,6 +67,15 @@ export const PLANS: PlanConfig[] = [
   },
 ]
 
+export type PlanPrice = {
+  product_id: string
+  plan: Plan
+  amount: number
+  currency: string
+  interval: string
+  interval_count: number
+}
+
 export type SubscriptionStatus = {
   plan: Plan
   plan_name: string

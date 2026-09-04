@@ -4,6 +4,7 @@ import {
   ArrowLeft, ShoppingCart, Camera, CameraOff, Check, Loader2,
   Zap, ZapOff, Search, X, Plus, Monitor,
 } from "lucide-react";
+import { ApiError } from "@/lib/api";
 import { productsApi } from "@/lib/products";
 import { readProductsCache, prefetchAllProducts, findByBarcode, searchByName } from "@/lib/productCache";
 import { catalogApi } from "@/lib/catalog";
@@ -175,7 +176,8 @@ export default function Scanner() {
       setFeedback({ msg: `${product.name} agregado`, kind: "ok" });
       setTimeout(() => setFeedback(null), 2000);
       return;
-    } catch {
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 401) throw err;
       // no está en inventario
     }
     try {
@@ -191,7 +193,8 @@ export default function Scanner() {
         setUnknownError("");
         setShowUnknownModal(true);
       }
-    } catch {
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 401) throw err;
       setFeedback(null);
       setUnknownBarcode(code);
       setUnknownName("");

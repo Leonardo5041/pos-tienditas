@@ -26,6 +26,24 @@ export default function Subscription() {
     enabled: !!user,
   })
 
+  const { data: planPrices } = useQuery({
+    queryKey: ['stripe', 'plans'],
+    queryFn: stripeApi.getPlans,
+    staleTime: 5 * 60 * 1000,
+    enabled: !!user,
+  })
+
+  const formatPlanPrice = (productId: string, fallback: string): string => {
+    const found = planPrices?.find(p => p.product_id === productId)
+    if (!found) return fallback
+    return new Intl.NumberFormat('es-MX', {
+      style: 'currency',
+      currency: found.currency.toUpperCase(),
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    }).format(found.amount / 100)
+  }
+
   const handleSelectPlan = async (productId: string) => {
     setLoadingPlan(productId)
     try {
@@ -186,7 +204,7 @@ export default function Subscription() {
 
               <div className="flex items-baseline gap-1">
                 <span className="text-4xl font-bold text-[#f0f0f0]" style={{ fontFamily: 'DM Mono, monospace' }}>
-                  {plan.price}
+                  {formatPlanPrice(plan.id, plan.price)}
                 </span>
                 <span className="text-sm text-[#666]">/{plan.period}</span>
               </div>

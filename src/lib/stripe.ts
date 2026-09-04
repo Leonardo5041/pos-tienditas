@@ -1,5 +1,5 @@
 import { apiFetch } from './api'
-import type { SubscriptionStatus } from '../types/subscription'
+import type { PlanPrice, SubscriptionStatus } from '../types/subscription'
 
 export const stripeApi = {
   createCheckout: (product_id: string) =>
@@ -19,4 +19,7 @@ export const stripeApi = {
       method: 'POST',
       body: JSON.stringify({ session_id }),
     }),
+
+  getPlans: () =>
+    apiFetch<PlanPrice[]>('/api/v1/stripe/plans'),
 }

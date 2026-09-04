@@ -62,6 +62,23 @@ export default function Login() {
         <h2 className="text-lg font-semibold text-[#f0f0f0] mb-1">Bienvenido de vuelta</h2>
         <p className="text-sm text-[#666] mb-6">Ingresa a tu tienda</p>
 
+        {new URLSearchParams(window.location.search).get("expired") && (
+          <div
+            style={{
+              background: "rgba(255,159,67,0.1)",
+              border: "1px solid rgba(255,159,67,0.2)",
+              borderRadius: "10px",
+              padding: "12px 16px",
+              marginBottom: "16px",
+              fontSize: "13px",
+              color: "#ff9f43",
+              textAlign: "center",
+            }}
+          >
+            Tu sesión expiró. Vuelve a entrar para continuar.
+          </div>
+        )}
+
         <form onSubmit={handleSubmit}>
           <label className="block text-xs font-semibold text-[#999] uppercase tracking-wider mb-2">
             Teléfono
