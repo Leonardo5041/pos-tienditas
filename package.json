@@ -10,6 +10,10 @@
     "lint": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:e2e": "playwright test",
+    "test:e2e:critical": "playwright test e2e/sales.spec.ts e2e/offline.spec.ts e2e/register.spec.ts e2e/credit.spec.ts e2e/regression.spec.ts",
+    "test:e2e:ui": "playwright test --ui",
+    "test:e2e:report": "playwright show-report",
     "e2e": "playwright test",
     "e2e:ui": "playwright test --ui",
     "e2e:headed": "playwright test --headed"

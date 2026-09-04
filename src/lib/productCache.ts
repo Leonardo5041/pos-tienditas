@@ -50,7 +50,7 @@ export async function findByBarcode(barcode: string): Promise<Product | undefine
 export async function searchByName(query: string): Promise<Product[]> {
   const q = query.toUpperCase();
   return await posDb.productsCache
-    .filter((p) => p.name.includes(q) || (p.barcode ?? "").includes(q))
+    .filter((p) => p.name.toUpperCase().includes(q) || (p.barcode ?? "").toUpperCase().includes(q))
     .limit(10)
     .toArray();
 }

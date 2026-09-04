@@ -1,8 +1,10 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { salesApi } from "@/lib/sales";
 import { pendingSalesDb } from "@/lib/db";
+import { useAuthStore } from "@/stores/authStore";
 
 export function useOfflineSync() {
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const [pendingCount, setPendingCount] = useState(0);
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncedMessage, setSyncedMessage] = useState<string | null>(null);
@@ -86,6 +88,10 @@ export function useOfflineSync() {
     window.addEventListener("online", handleOnline);
     return () => window.removeEventListener("online", handleOnline);
   }, [sync]);
+
+  useEffect(() => {
+    if (isAuthenticated && navigator.onLine) void sync();
+  }, [isAuthenticated, sync]);
 
   useEffect(() => {
     return () => {
