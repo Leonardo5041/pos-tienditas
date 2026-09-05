@@ -278,9 +278,9 @@ test('TEST 4 (CRÍTICO) — Ventas pendientes en Dexie NO se borran cuando 401 r
   await context.setOffline(false);
 
   // Navigate to scanner — ProductPrefetcher makes an API call with the tampered token.
-  // The API returns 401 → interceptor: clears localStorage, window.location.href = '/login?expired=1'.
-  // page.goto may or may not resolve before the hard nav; waitForURL catches the final URL.
-  await page.goto(`${BASE}/scanner`);
+  // The API returns 401 → interceptor fires → window.location.href = '/login?expired=1'.
+  // This may abort the page.goto mid-load (ERR_ABORTED), which is expected behavior.
+  await page.goto(`${BASE}/scanner`).catch(() => {});
   await page.waitForURL(/\/login/, { timeout: 12_000 });
   // Wait for useOfflineSync's mocked sync() to settle so the context is stable.
   await page.waitForLoadState('networkidle');

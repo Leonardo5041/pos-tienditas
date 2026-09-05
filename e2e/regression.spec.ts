@@ -169,24 +169,26 @@ test(
     // Wait for all async queries (daily/weekly/monthly) to resolve
     await page.waitForTimeout(2_500);
 
-    // These values should never appear in the rendered output
+    // These values should never appear in the rendered output.
+    // Use regex (case-sensitive) to avoid false-positive matches on CSS-uppercase text
+    // like "GANANCIA" which contains "nan" case-insensitively.
     await expect(
-      page.getByText('NaN'),
+      page.getByText(/NaN/),
       'No debe haber "NaN" visible en reportes',
     ).not.toBeVisible();
 
     await expect(
-      page.getByText('-Infinity'),
+      page.getByText(/-Infinity/),
       'No debe haber "-Infinity" visible en reportes',
     ).not.toBeVisible();
 
     await expect(
-      page.getByText('Infinity'),
+      page.getByText(/\bInfinity\b/),
       'No debe haber "Infinity" visible en reportes',
     ).not.toBeVisible();
 
     await expect(
-      page.getByText('undefined'),
+      page.getByText(/\bundefined\b/),
       'No debe haber "undefined" visible en reportes',
     ).not.toBeVisible();
 

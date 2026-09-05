@@ -418,6 +418,7 @@ export default function CashRegister() {
                   type="number"
                   inputMode="decimal"
                   placeholder="0.00"
+                  min="0"
                   autoFocus
                   value={closeForm.declared_amount}
                   onChange={(e) => setCloseForm((f) => ({ ...f, declared_amount: e.target.value }))}
@@ -436,7 +437,7 @@ export default function CashRegister() {
             />
 
             <button
-              disabled={!closeForm.declared_amount || closeMutation.isPending}
+              disabled={!closeForm.declared_amount || parseFloat(closeForm.declared_amount) < 0 || closeMutation.isPending}
               onClick={() => closeMutation.mutate()}
               className="w-full h-12 rounded-[12px] font-bold text-black disabled:opacity-40"
               style={{ background: "#00e5a0" }}

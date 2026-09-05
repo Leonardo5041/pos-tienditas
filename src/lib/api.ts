@@ -27,12 +27,10 @@ export async function apiFetch<T>(path: string, options?: RequestInit): Promise<
 
   if (!res.ok) {
     if (res.status === 401 && !path.startsWith("/api/v1/auth/")) {
-      if (localStorage.getItem("token")) {
-        localStorage.removeItem("token");
-        localStorage.removeItem("user");
-        localStorage.removeItem("store");
-        window.location.href = "/login?expired=1";
-      }
+      localStorage.removeItem("token");
+      localStorage.removeItem("user");
+      localStorage.removeItem("store");
+      window.location.href = "/login?expired=1";
       throw new ApiError(401, "Sesión expirada");
     }
     throw new ApiError(res.status, (body as { error?: string }).error ?? "Error desconocido");

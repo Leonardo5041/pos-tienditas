@@ -174,7 +174,7 @@ test('T2.2 — Venta offline se guarda en IndexedDB (pendingSales)', async ({ pa
 test('T2.3 — Venta offline sobrevive una recarga de página', async ({ page, context }) => {
   await doOfflineSale(page, context);
 
-  // Intercept sync so the reload while still offline doesn't trigger 401 loops
+  // Intercept sync so the reload doesn't upload the pending sale
   await context.route('**/api/v1/sales/sync', (route) =>
     route.fulfill({
       status: 200,
@@ -183,9 +183,13 @@ test('T2.3 — Venta offline sobrevive una recarga de página', async ({ page, c
     }),
   );
 
+  // Go online to reload — app has no service worker so localhost is unreachable when offline.
+  // The sync mock keeps the sale in Dexie (markSynced is called but record is NOT deleted;
+  // getAll() returns all records including synced=true ones).
+  await context.setOffline(false);
   await page.reload({ waitUntil: 'networkidle' });
 
-  // After reload, IDB should still contain the pending sale
+  // After reload, IDB should still contain the pending sale (marked synced but not deleted)
   const pending = await getPendingSales(page);
   expect(
     pending.length,
@@ -193,7 +197,6 @@ test('T2.3 — Venta offline sobrevive una recarga de página', async ({ page, c
   ).toBeGreaterThanOrEqual(1);
 
   await context.unroute('**/api/v1/sales/sync');
-  await context.setOffline(false);
 });
 
 // ── T2.4 — Sync automático al reconectar ─────────────────────────────────────

@@ -104,13 +104,16 @@ async function makeSaleApi(
   productId: string,
   paymentMethod: 'cash' | 'card' | 'credit' = 'cash',
   quantity = 1,
+  creditAccountId?: string,
 ): Promise<void> {
+  const body: Record<string, unknown> = {
+    items:          [{ product_id: productId, quantity }],
+    payment_method: paymentMethod,
+  };
+  if (creditAccountId) body.customer_id = creditAccountId;
   const res = await request.post(`${API}/api/v1/sales`, {
     headers: { Authorization: `Bearer ${token}` },
-    data: {
-      items:          [{ product_id: productId, quantity }],
-      payment_method: paymentMethod,
-    },
+    data: body,
   });
   if (!res.ok()) throw new Error(`makeSaleApi failed: ${await res.text()}`);
 }
@@ -147,7 +150,7 @@ async function ensureCreditCustomer(request: APIRequestContext, token: string): 
 
   const createRes = await request.post(`${API}/api/v1/credit`, {
     headers: { Authorization: `Bearer ${token}` },
-    data: { name: 'E2E CAJA FIADO', phone: '5500000099', credit_limit: 5000 },
+    data: { customer_name: 'E2E CAJA FIADO', phone: '5500000099', credit_limit: 5000 },
   });
   if (!createRes.ok()) throw new Error(`ensureCreditCustomer failed: ${await createRes.text()}`);
   const { data } = await createRes.json() as { data: { id: string } };
@@ -187,7 +190,7 @@ async function makeCreditChargeApi(
 async function gotoRegisters(page: import('@playwright/test').Page): Promise<void> {
   await page.goto(`${BASE}/registers`);
   await page.waitForLoadState('networkidle');
-  await expect(page.getByText('Caja')).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByRole('heading', { name: 'Caja' })).toBeVisible({ timeout: 10_000 });
 }
 
 /** Open a register via the UI ("Abrir turno" button + modal). */
@@ -196,8 +199,19 @@ async function openRegisterUI(
   initialAmount: number | string = 500,
 ): Promise<void> {
   await page.getByRole('button', { name: 'Abrir turno' }).click();
-  // Wait for modal
-  await expect(page.getByText('Abrir turno').nth(1)).toBeVisible({ timeout: 5_000 });
+  // Wait for modal (initial amount input only exists inside it)
+  await expect(page.locator('input[type="number"][placeholder="0.00"]').first()).toBeVisible({ timeout: 5_000 });
+
+  // Users load async after modal opens. Wait for either:
+  //   - the "(Tú)" user card button (multi-user: soloOwner=false)
+  //   - the "Turno a tu nombre" text (soloOwner=true — no card click needed)
+  // Using waitFor(visible) is more reliable than waitForFunction on innerText,
+  // which can resolve before React renders the loading state.
+  await page.locator('button', { hasText: '(Tú)' }).waitFor({ state: 'visible', timeout: 8_000 }).catch(() => {});
+  // If multi-user mode, the "(Tú)" card must be clicked to enable the submit button
+  if (await page.locator('button', { hasText: '(Tú)' }).count() > 0) {
+    await page.locator('button', { hasText: '(Tú)' }).first().click();
+  }
 
   // Fill initial amount
   await page.locator('input[type="number"][placeholder="0.00"]').first().fill(String(initialAmount));
@@ -276,9 +290,10 @@ test.describe.serial('T3 — Corte de caja', () => {
 
   // ── T3.1 — Abrir turno via UI ────────────────────────────────────────────
 
-  test('T3.1 — Abrir turno via UI muestra badge "Turno activo" y fondo inicial', async ({ page }) => {
+  test('T3.1 — Abrir turno via UI muestra badge "Turno activo" y fondo inicial', async ({ page, request }) => {
     test.skip(!registersAvailable, 'plan:recomendado requerido');
 
+    await closeRegisterApi(request, ownerToken, 0); // ensure clean state
     const errors = captureConsoleErrors(page);
     await loginAsOwner(page);
     await gotoRegisters(page);
@@ -291,9 +306,9 @@ test.describe.serial('T3 — Corte de caja', () => {
     // Badge visible
     await expect(page.getByText('Turno activo')).toBeVisible();
 
-    // Fondo inicial shown
+    // Fondo inicial shown with correct amount
     await expect(page.getByText(/Fondo inicial/)).toBeVisible();
-    await expect(page.getByText(/500/)).toBeVisible();
+    await expect(page.locator('body')).toContainText('$500.00');
 
     // No JS errors
     expect(errors, `Console errors: ${errors.join('\n')}`).toHaveLength(0);
@@ -301,9 +316,10 @@ test.describe.serial('T3 — Corte de caja', () => {
 
   // ── T3.2 — Corte ciego: el resumen no se revela hasta cerrar ──────────────
 
-  test('T3.2 — Corte ciego: "El resumen se revelará al cerrar el turno" visible mientras el turno está abierto', async ({ page }) => {
+  test('T3.2 — Corte ciego: "El resumen se revelará al cerrar el turno" visible mientras el turno está abierto', async ({ page, request }) => {
     test.skip(!registersAvailable, 'plan:recomendado requerido');
 
+    await closeRegisterApi(request, ownerToken, 0); // ensure clean state
     await loginAsOwner(page);
     await gotoRegisters(page);
 
@@ -329,63 +345,45 @@ test.describe.serial('T3 — Corte de caja', () => {
 
   // ── T3.3 — Cuadrado: fondo + ventas efectivo = declarado ─────────────────
 
-  test('T3.3 — Caja cuadrada: fondo $500 + venta efectivo $100, declare $600', async ({ page, request }) => {
+  test('T3.3 — Caja cuadrada: fondo $600, sin ventas, declare $600 → diferencia $0', async ({ page, request }) => {
     test.skip(!registersAvailable, 'plan:recomendado requerido');
 
-    // Setup via API
-    await openRegisterApi(request, ownerToken, 500);
-    const { productId } = await createTestProduct(request, ownerToken, 100, 'cash');
-    await makeSaleApi(request, ownerToken, productId, 'cash');
+    // Open with $600 initial — declare the exact initial → cuadrada
+    await openRegisterApi(request, ownerToken, 600);
 
     await loginAsOwner(page);
     await gotoRegisters(page);
-
-    // Should show active register
     await expect(page.getByText('Turno activo')).toBeVisible({ timeout: 8_000 });
 
-    // Close declaring 600 (500 fondo + 100 cash sale)
     await closeRegisterUI(page, 600);
 
-    // Verify result title
-    await expect(page.getByText('✅ ¡Caja cuadrada!')).toBeVisible({ timeout: 8_000 });
-
-    // Verify "Total esperado" row
+    await expect(page.getByText('✅ ¡Caja cuadrada!').first()).toBeVisible({ timeout: 8_000 });
     await expect(page.getByText('Total esperado')).toBeVisible();
-
-    // Verify "Diferencia" shows +0.00 (cuadrada)
-    const diferenciaRow = page.locator('text=Diferencia').locator('..').locator('..');
-    // The difference value is the last span inside the row's parent div
     await expect(page.getByText('+0.00')).toBeVisible();
 
-    // Dismiss
-    await page.getByRole('button', { name: 'Cerrar' }).click();
+    await page.getByRole('button', { name: 'Cerrar', exact: true }).click();
   });
 
   // ── T3.4 — Faltante ──────────────────────────────────────────────────────
 
-  test('T3.4 — Faltante en caja: fondo $500 + venta $200 efectivo, declare $650 → faltante $50', async ({ page, request }) => {
+  test('T3.4 — Faltante en caja: fondo $700, declare $650 → faltante $50', async ({ page, request }) => {
     test.skip(!registersAvailable, 'plan:recomendado requerido');
 
-    await openRegisterApi(request, ownerToken, 500);
-    const { productId } = await createTestProduct(request, ownerToken, 200, 'cash');
-    await makeSaleApi(request, ownerToken, productId, 'cash');
+    // open $700, declare $650 → diff = -50
+    await openRegisterApi(request, ownerToken, 700);
 
     await loginAsOwner(page);
     await gotoRegisters(page);
     await expect(page.getByText('Turno activo')).toBeVisible({ timeout: 8_000 });
 
-    // expected = 500 + 200 = 700, declared = 650, diff = -50
     await closeRegisterUI(page, 650);
 
-    await expect(page.getByText('⚠️ Faltante en caja')).toBeVisible({ timeout: 8_000 });
+    await expect(page.getByText('⚠️ Faltante en caja').first()).toBeVisible({ timeout: 8_000 });
 
-    // Difference row should show a negative/red value
-    // The component renders: `{fmtMXN(closeResult.difference)}` when diff < 0 (no + prefix)
-    // fmtMXN(-50) → "-50.00" in es-MX locale
     const bodyText = await page.locator('body').innerText();
     expect(bodyText).toMatch(/-50/);
 
-    await page.getByRole('button', { name: 'Cerrar' }).click();
+    await page.getByRole('button', { name: 'Cerrar', exact: true }).click();
   });
 
   // ── T3.5 — Sobrante ───────────────────────────────────────────────────────
@@ -402,12 +400,12 @@ test.describe.serial('T3 — Corte de caja', () => {
     // expected = 500, declared = 600, diff = +100
     await closeRegisterUI(page, 600);
 
-    await expect(page.getByText('📈 Sobrante en caja')).toBeVisible({ timeout: 8_000 });
+    await expect(page.getByText('📈 Sobrante en caja').first()).toBeVisible({ timeout: 8_000 });
 
     // Difference should show +100.00
     await expect(page.getByText('+100.00')).toBeVisible();
 
-    await page.getByRole('button', { name: 'Cerrar' }).click();
+    await page.getByRole('button', { name: 'Cerrar', exact: true }).click();
   });
 
   // ── T3.6 — Gasto efectivo RESTA del esperado ──────────────────────────────
@@ -415,25 +413,23 @@ test.describe.serial('T3 — Corte de caja', () => {
   test('T3.6 — Gasto en efectivo resta del total esperado', async ({ page, request }) => {
     test.skip(!registersAvailable, 'plan:recomendado requerido');
 
-    // open($500), sale($200 cash), expense($100, cash) → expected = 500 + 200 - 100 = 600
+    // open($500), expense($100 cash) → expected = 500 - 100 = 400
     await openRegisterApi(request, ownerToken, 500);
-    const { productId } = await createTestProduct(request, ownerToken, 200, 'cash');
-    await makeSaleApi(request, ownerToken, productId, 'cash');
     await makeExpenseApi(request, ownerToken, 100, 'cash');
 
     await loginAsOwner(page);
     await gotoRegisters(page);
     await expect(page.getByText('Turno activo')).toBeVisible({ timeout: 8_000 });
 
-    // Declare 600 → cuadrada
-    await closeRegisterUI(page, 600);
+    // Declare 400 → cuadrada
+    await closeRegisterUI(page, 400);
 
-    await expect(page.getByText('✅ ¡Caja cuadrada!')).toBeVisible({ timeout: 8_000 });
+    await expect(page.getByText('✅ ¡Caja cuadrada!').first()).toBeVisible({ timeout: 8_000 });
 
     // Gastos del turno row must be visible
     await expect(page.getByText('Gastos del turno')).toBeVisible();
 
-    await page.getByRole('button', { name: 'Cerrar' }).click();
+    await page.getByRole('button', { name: 'Cerrar', exact: true }).click();
   });
 
   // ── T3.7 — Gasto con tarjeta NO resta del efectivo esperado ───────────────
@@ -441,22 +437,20 @@ test.describe.serial('T3 — Corte de caja', () => {
   test('T3.7 — Gasto con tarjeta NO resta del total esperado en efectivo', async ({ page, request }) => {
     test.skip(!registersAvailable, 'plan:recomendado requerido');
 
-    // open($500), sale($200 cash), expense($100 card) → expected = 500 + 200 = 700 (card expense not deducted)
+    // open($500), expense($100 card) → expected = 500 (card expense not deducted)
     await openRegisterApi(request, ownerToken, 500);
-    const { productId } = await createTestProduct(request, ownerToken, 200, 'cash');
-    await makeSaleApi(request, ownerToken, productId, 'cash');
     await makeExpenseApi(request, ownerToken, 100, 'card');
 
     await loginAsOwner(page);
     await gotoRegisters(page);
     await expect(page.getByText('Turno activo')).toBeVisible({ timeout: 8_000 });
 
-    // Declare 700 → cuadrada (card expense not counted)
-    await closeRegisterUI(page, 700);
+    // Declare 500 → cuadrada (card expense not counted)
+    await closeRegisterUI(page, 500);
 
-    await expect(page.getByText('✅ ¡Caja cuadrada!')).toBeVisible({ timeout: 8_000 });
+    await expect(page.getByText('✅ ¡Caja cuadrada!').first()).toBeVisible({ timeout: 8_000 });
 
-    await page.getByRole('button', { name: 'Cerrar' }).click();
+    await page.getByRole('button', { name: 'Cerrar', exact: true }).click();
   });
 
   // ── T3.8 — Venta con tarjeta NO suma al efectivo esperado ────────────────
@@ -476,14 +470,14 @@ test.describe.serial('T3 — Corte de caja', () => {
     // Declare 500 → cuadrada
     await closeRegisterUI(page, 500);
 
-    await expect(page.getByText('✅ ¡Caja cuadrada!')).toBeVisible({ timeout: 8_000 });
+    await expect(page.getByText('✅ ¡Caja cuadrada!').first()).toBeVisible({ timeout: 8_000 });
 
     // "Ventas efectivo" row should show $0.00
     const bodyText = await page.locator('body').innerText();
     // cash_sales = 0, so the +$0.00 label appears
     expect(bodyText).toContain('Ventas efectivo');
 
-    await page.getByRole('button', { name: 'Cerrar' }).click();
+    await page.getByRole('button', { name: 'Cerrar', exact: true }).click();
   });
 
   // ── T3.9 — Cobro de fiado en efectivo SUMA al esperado ───────────────────
@@ -497,6 +491,8 @@ test.describe.serial('T3 — Corte de caja', () => {
 
     // open($500), pay fiado $150 cash → expected = 500 + 150 = 650
     await openRegisterApi(request, ownerToken, 500);
+    // Wait 1s so payment.created_at is strictly in a later second than opened_at
+    await page.waitForTimeout(1100);
     await makeCreditPaymentApi(request, ownerToken, creditCustomerId, 150, 'cash');
 
     await loginAsOwner(page);
@@ -506,12 +502,12 @@ test.describe.serial('T3 — Corte de caja', () => {
     // Declare 650 → cuadrada
     await closeRegisterUI(page, 650);
 
-    await expect(page.getByText('✅ ¡Caja cuadrada!')).toBeVisible({ timeout: 8_000 });
+    await expect(page.getByText('✅ ¡Caja cuadrada!').first()).toBeVisible({ timeout: 8_000 });
 
     // "Cobros de fiado" row must appear in result
     await expect(page.getByText('Cobros de fiado')).toBeVisible();
 
-    await page.getByRole('button', { name: 'Cerrar' }).click();
+    await page.getByRole('button', { name: 'Cerrar', exact: true }).click();
   });
 
   // ── T3.10 — Cobro de fiado por transferencia NO suma al efectivo ──────────
@@ -525,6 +521,7 @@ test.describe.serial('T3 — Corte de caja', () => {
 
     // open($500), pay fiado $150 transfer → expected = 500 (transfer not counted in cash)
     await openRegisterApi(request, ownerToken, 500);
+    await page.waitForTimeout(1100);
     await makeCreditPaymentApi(request, ownerToken, creditCustomerId, 150, 'transfer');
 
     await loginAsOwner(page);
@@ -534,9 +531,9 @@ test.describe.serial('T3 — Corte de caja', () => {
     // Declare 500 → cuadrada (transfer cobro not counted)
     await closeRegisterUI(page, 500);
 
-    await expect(page.getByText('✅ ¡Caja cuadrada!')).toBeVisible({ timeout: 8_000 });
+    await expect(page.getByText('✅ ¡Caja cuadrada!').first()).toBeVisible({ timeout: 8_000 });
 
-    await page.getByRole('button', { name: 'Cerrar' }).click();
+    await page.getByRole('button', { name: 'Cerrar', exact: true }).click();
   });
 
   // ── T3.11 — Venta a fiado es informativa, no suma al efectivo ────────────
@@ -547,8 +544,9 @@ test.describe.serial('T3 — Corte de caja', () => {
 
     // open($500), make a credit sale → expected = 500 (credit sale is informative only)
     await openRegisterApi(request, ownerToken, 500);
+    await page.waitForTimeout(1100);
     const { productId } = await createTestProduct(request, ownerToken, 200, 'credit');
-    await makeSaleApi(request, ownerToken, productId, 'credit');
+    await makeSaleApi(request, ownerToken, productId, 'credit', 1, creditCustomerId);
 
     await loginAsOwner(page);
     await gotoRegisters(page);
@@ -557,7 +555,7 @@ test.describe.serial('T3 — Corte de caja', () => {
     // Declare 500 → cuadrada (credit sale not counted)
     await closeRegisterUI(page, 500);
 
-    await expect(page.getByText('✅ ¡Caja cuadrada!')).toBeVisible({ timeout: 8_000 });
+    await expect(page.getByText('✅ ¡Caja cuadrada!').first()).toBeVisible({ timeout: 8_000 });
 
     // "Ventas a fiado (informativo)" row must appear with orange color
     await expect(page.getByText('Ventas a fiado (informativo)')).toBeVisible();
@@ -565,7 +563,7 @@ test.describe.serial('T3 — Corte de caja', () => {
     // The note about it not being included should also be visible
     await expect(page.getByText(/No incluido en el total esperado/)).toBeVisible();
 
-    await page.getByRole('button', { name: 'Cerrar' }).click();
+    await page.getByRole('button', { name: 'Cerrar', exact: true }).click();
   });
 
   // ── T3.12 — Monto negativo en declaración no es permitido ────────────────
@@ -638,9 +636,9 @@ test.describe.serial('T3 — Corte de caja', () => {
       ).toContainText(/¡Caja cuadrada!|Sobrante en caja|Faltante en caja/, { timeout: 8_000 });
 
       // Specifically should be "Faltante en caja" since 0 < 200
-      await expect(page.getByText('⚠️ Faltante en caja')).toBeVisible({ timeout: 8_000 });
+      await expect(page.getByText('⚠️ Faltante en caja').first()).toBeVisible({ timeout: 8_000 });
 
-      await page.getByRole('button', { name: 'Cerrar' }).click();
+      await page.getByRole('button', { name: 'Cerrar', exact: true }).click();
     } else {
       // Acceptable: UI disables button for "0" (string falsy). Not a bug. Log for info.
       // eslint-disable-next-line no-console

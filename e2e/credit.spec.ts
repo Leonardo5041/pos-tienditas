@@ -30,7 +30,7 @@ async function createCustomerApi(
 ): Promise<string> {
   const res = await request.post(`${API}/api/v1/credit`, {
     headers: { Authorization: `Bearer ${token}` },
-    data: { name, phone, credit_limit: 5000 },
+    data: { customer_name: name, customer_phone: phone },
   });
   if (!res.ok()) throw new Error(`createCustomerApi failed: ${await res.text()}`);
   const { data } = await res.json() as { data: { id: string } };
@@ -237,7 +237,7 @@ test.describe.serial('T4 — Fiado / Crédito', () => {
     await clickChargeButton(page, customerName);
 
     // Modal "Agregar fiado" opens
-    await expect(page.getByText('Agregar fiado')).toBeVisible({ timeout: 5_000 });
+    await expect(page.getByText('Agregar fiado').first()).toBeVisible({ timeout: 5_000 });
 
     // Enter amount
     await page.locator('input[type="number"]').first().fill('120');
@@ -249,7 +249,7 @@ test.describe.serial('T4 — Fiado / Crédito', () => {
     await page.getByRole('button', { name: 'Agregar fiado' }).click();
 
     // Modal closes
-    await expect(page.getByText('Agregar fiado')).not.toBeVisible({ timeout: 5_000 });
+    await expect(page.getByText('Agregar fiado').first()).not.toBeVisible({ timeout: 5_000 });
 
     // Customer balance should now show $120.00
     const card = getCustomerCard(page, customerName);
@@ -367,8 +367,8 @@ test.describe.serial('T4 — Fiado / Crédito', () => {
     // Edit modal opens
     await expect(page.getByText('Editar cliente')).toBeVisible({ timeout: 5_000 });
 
-    // Clear name field and type new name
-    const nameInput = page.locator('input').first();
+    // Clear name field and type new name (data-testid scopes to edit modal's name input)
+    const nameInput = page.locator('[data-testid="edit-customer-name"]');
     await nameInput.clear();
     await nameInput.fill(updatedName);
 

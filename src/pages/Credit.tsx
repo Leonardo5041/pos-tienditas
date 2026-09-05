@@ -346,6 +346,7 @@ function EditClientModal({
             onChange={(e) => setName(e.target.value.toUpperCase())}
             style={{ textTransform: "uppercase" }}
             autoFocus
+            data-testid="edit-customer-name"
           />
         </div>
         <div>
